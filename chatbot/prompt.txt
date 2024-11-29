@@ -1,0 +1,59 @@
+scrivi una relazione tecnica sul lavoro fatto. Il lavoro fatto è partito dopo questa offerta:
+
+Spettabile prof Primo Zingaretti 
+DII – UNIVPM 
+Via Brecce Bianche 12 
+60131 ANCONA (AN) 
+Pesaro, 18/09/2024 
+Oggetto: Progettazione e Sviluppo di un back-end per la gestione di modelli 3D ottenuti da approcci di 
+intelligenza arti�iciale generativa nell'ambito del progetto “CTE Square – Casa delle Tecnologie 
+Emergenti per Cultura, Turismo ed Engagement” – CUP: D74J22000930008 
+PREMESSO CHE 
+UNIVPM ha espresso a DEEP REALITY SRL la necessità di attivare un rapporto di collaborazione per la 
+realizzazione di attività inquadrate nel progetto “CTE Square – Casa delle Tecnologie Emergenti per 
+Cultura, Turismo ed Engagement”. 
+Il progetto CTE Square è articolato in 4 WP tecnici (di cui uno dedicato alla ricerca e sviluppo) e 8 use 
+cases, fra cui lo use case C “Modelli 3D generativi e partecipativi (NeRF)” 
+Deep Reality è una start up innovativa con sede a Pesaro che dal 2023 opera all’avanguardia del settore 
+della realtà virtuale e dell’intelligenza arti�iciale. 
+OGGETTO DELLA PROPOSTA 
+Oggetto 
+L’attività in oggetto rientra nello use case C “Modelli 3D generativi e partecipativi (NeRF)”, all’interno della 
+fase WP3 del progetto CTE Square 
+L’attività consiste nella progettazione e nello sviluppo di un back-end ef�iciente e scalabile per la gestione 
+dei modelli 3D generati tramite approcci di intelligenza arti�iciale generativa. Questo sistema permetterà 
+una gestione ottimale delle risorse, garantendo elevate prestazioni e sicurezza dei dati. 
+Descrizione del Servizio 
+Il servizio prevede la creazione di un’infrastruttura back-end all'avanguardia, progettata 
+per supportare e ottimizzare l'archiviazione, la gestione e l'uso dei modelli 3D. Questo 
+sistema avanzato integrerà algoritmi so�isticati in Python per 
+l’elaborazione dei dati generati dall'AI, assicurando una 
+gestione ef�iciente e scalabile dei modelli tridimensionali, a 
+seconda dello speci�ico task richiesto, e quindi dello speci�ico modello NERF e 
+degli speci�ici parametri che si vorranno utilizzare. 
+Deep Reality s.r.l. Viale Goffredo Mameli 44 Pesaro, 61121, p. IVA 02795670419 
+L'infrastruttura si affaccerà all’esterno tramite interfacce API robuste e �lessibili, che garantiranno 
+l'interoperabilità con altri sistemi esterni e piattaforme, facilitando l'integrazione e la sincronizzazione dei 
+dati tra diversi ambienti di lavoro. Tali API saranno create utilizzando Node.js. 
+L'architettura sarà implementata su servizi AWS e sarà progettata per essere altamente modulare e 
+facilmente adattabile alle esigenze future, con un focus particolare sulla sicurezza dei dati e sulla resilienza 
+dell'infrastruttura. Il servizio AWS S3 verrà utilizzato allo scopo di hostare l’intera infrastruttura e i 
+modelli di intelligenza arti�iciale NERF. Il servizio AWS Lambda verrà utilizzato per realizzare tutte le 
+chiamate ai modelli e per integrare gli algoritmi di cui sopra, dunque entrerà in gioco anche nelle fasi di 
+preprocessing e postprocessing dei dati in ingresso e in uscita. Altri servizi AWS, quali EC2 e altri, non 
+presenti nell’immagine, serviranno soprattutto per l’inizializzazione dell’intero sistema appena descritto. 
+Tempi e Modalità di Esecuzione 
+Il progetto sarà suddiviso in più fasi, a partire dalla progettazione dell'architettura, seguita dallo sviluppo e 
+dai test. I tempi stimati per il completamento sono di 3 mesi, con aggiornamenti periodici e veri�iche 
+intermedie per garantire il rispetto delle speci�iche concordate. 
+Corrispettivo 
+Sulla base delle informazioni ricevute, questa è la nostra migliore offerta per i servizi richiesti:  
+€ 30.000,00 
+Deep Reality s.r.l. Viale Goffredo Mameli 44 Pesaro, 61121, p. IVA 02795670419 
+Gli importi indicati si intendono al netto di IVA che verrà applicata secondo normativa di legge e di 
+eventuali trasferte presso la vostra sede.  
+Pesaro, 18/09/2024 
+Per Accettazione 
+________________ 
+Deep Reality S.r.l. 
+Deep Reality s.r.l. Viale Goffredo Mameli 44 Pesaro, 61121, p. IVA 02795670419 

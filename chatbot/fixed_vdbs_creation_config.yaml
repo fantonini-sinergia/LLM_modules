@@ -1,0 +1,16 @@
+device: cuda
+root_directory: '\\192.168.1.90\public\Dear\Manuali Linee'
+embedding_model_name: 'sentence-transformers\all-MiniLM-L6-v2'
+bunches_params:
+  chars_per_line: 60
+  splits:
+    - lines_per_bunch: 60
+      bunches_per_split: 2
+      extend: null
+    # - lines_per_bunch: 30
+    #   bunches_per_split: 2
+    #   extend: null
+    - lines_per_bunch: 10
+      bunches_per_split: 2
+      extend: 50
+  resplits: 2
