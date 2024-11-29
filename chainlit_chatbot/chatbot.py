@@ -40,7 +40,8 @@ async def on_chat_start():
     # permanent vdbs loading and initialization
     perm_vdbs = Vdbs.from_dir(
         constants.fixed_rag_data,
-        embedding_model.get_embeddings_for_vdb
+        embedding_model.get_embeddings_for_vdb,
+        constants.chars_per_word,
         )
     print("permanent vdbs loaded")
     cl.user_session.set("perm_vdbs", perm_vdbs)
@@ -72,7 +73,8 @@ async def on_message(message: cl.Message):
         temp_vdbs = Vdbs.from_files_list(
             files, 
             embedding_model.get_embeddings_for_vdb, 
-            constants.vdbs_params
+            constants.chars_per_word,
+            constants.vdbs_params,
             )
         print("Temporary vdbs created")
         cl.user_session.set("temp_vdbs", temp_vdbs)

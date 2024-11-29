@@ -2,7 +2,6 @@ import os
 import math
 import numpy as np
 import datasets
-from constants import chars_per_word
 from file_reading import read_file
 
 def split_in_bunches(
@@ -108,7 +107,8 @@ class Vdbs:
             self, 
             vdbs_list,
             get_embeddings_for_vdb,
-            vdbs_path = None
+            chars_per_word,
+            vdbs_path = None,
             ):
         self.vdbs = vdbs_list
         
@@ -128,6 +128,7 @@ class Vdbs:
         cls,
         files, 
         get_embeddings_for_vdb,
+        chars_per_word,
         vdbs_params
     ):
         
@@ -217,13 +218,14 @@ class Vdbs:
                 "page": page_field,
                 }))
 
-        return cls(vdbs, get_embeddings_for_vdb)
+        return cls(vdbs, get_embeddings_for_vdb, chars_per_word)
     
     @classmethod
     def from_dir(
         cls,
         vdbs_path,
-        get_embeddings_for_vdb
+        get_embeddings_for_vdb,
+        chars_per_word
         ):
         
         vdbs = []
@@ -234,7 +236,7 @@ class Vdbs:
         for perm_vdb in vdbs:
             print(f'- {len(perm_vdb["page"])}')
         print("-"*20, "\n\n")
-        return cls(vdbs, get_embeddings_for_vdb, vdbs_path = vdbs_path)
+        return cls(vdbs, get_embeddings_for_vdb, chars_per_word, vdbs_path = vdbs_path)
 
 
     def get_rag_samples(
@@ -252,7 +254,7 @@ class Vdbs:
         """
 
         # calculate the number of bunches to be retrieved (decimal, same for all vdbs)
-        words_per_bunch_per_vdb = [len(vdb["content"][0])/chars_per_word for vdb in self.vdbs]
+        words_per_bunch_per_vdb = [len(vdb["content"][0])/self.chars_per_word for vdb in self.vdbs]
         add_bunches_per_vdb = []
         for i, _ in enumerate(words_per_bunch_per_vdb):
             if words_per_bunch_per_vdb[i] < add_words_nr_word_thr:
@@ -292,7 +294,7 @@ class Vdbs:
                 )
             
             # cut the last sample of every vdb
-            chars_in_last_bunch = words_in_last_bunch_per_vdb[i]*chars_per_word
+            chars_in_last_bunch = words_in_last_bunch_per_vdb[i]*self.chars_per_word
             nearest_exs["content"][-1] = nearest_exs["content"][-1][:chars_in_last_bunch]
             print(f"The last sample has been cut to {words_in_last_bunch_per_vdb[i]} words")
 
