@@ -1,21 +1,22 @@
 import os
 import chainlit as cl
-import constants
-from llm import Llm
-from embedding import Embedding
-from file_reading import extract_page
-from vdbs import Vdbs
+import tempfile
+import chatbot_constants as k
+from LLM_inference.llm import Llm
+from vector_databases.embedding import Embedding
+from vector_databases.file_processing import extract_page
+from vector_databases.vdbs import Vdbs
 
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 
-llm_name = os.path.join(constants.models_path, constants.llm_model)
-tokenizer_name = os.path.join(constants.models_path, constants.llm_tokenizer)
+llm_name = os.path.join(k.models_path, k.llm_model)
+tokenizer_name = os.path.join(k.models_path, k.llm_tokenizer)
 # embedding_model_name = os.path.join(constants.models_path, constants.embedding_model)
-embedding_model_name = constants.embedding_model
+embedding_model_name = k.embedding_model
 
-perm_context_word_len = constants.rag_context_word_len*constants.perm_context_ratio
-temp_context_word_len = constants.rag_context_word_len - perm_context_word_len
+perm_context_word_len = k.rag_context_word_len*k.perm_context_ratio
+temp_context_word_len = k.rag_context_word_len - perm_context_word_len
 
 
 
@@ -23,25 +24,25 @@ temp_context_word_len = constants.rag_context_word_len - perm_context_word_len
 async def on_chat_start():
 
     # Initialize system command, chat and context_len
-    cl.user_session.set("system", constants.system)
+    cl.user_session.set("system", k.system)
     cl.user_session.set("chat", [])
-    cl.user_session.set("context_len", len(constants.system[0]["content"]))
+    cl.user_session.set("context_len", len(k.system[0]["content"]))
 
     # LLM model initialization
-    llm_model = Llm(constants.bnb_config, llm_name, tokenizer_name)
+    llm_model = Llm(k.bnb_config, llm_name, tokenizer_name)
     print("LLM initialized")
     cl.user_session.set("llm_model", llm_model)
 
     # Embedding model initialization
-    embedding_model = Embedding(embedding_model_name)
+    embedding_model = Embedding(embedding_model_name, k.device)
     print("Embedding model initialized")
     cl.user_session.set("embedding_model", embedding_model)
 
     # permanent vdbs loading and initialization
     perm_vdbs = Vdbs.from_dir(
-        constants.fixed_rag_data,
+        k.fixed_rag_data,
         embedding_model.get_embeddings_for_vdb,
-        constants.chars_per_word,
+        k.chars_per_word,
         )
     print("permanent vdbs loaded")
     cl.user_session.set("perm_vdbs", perm_vdbs)
@@ -73,8 +74,8 @@ async def on_message(message: cl.Message):
         temp_vdbs = Vdbs.from_files_list(
             files, 
             embedding_model.get_embeddings_for_vdb, 
-            constants.chars_per_word,
-            constants.vdbs_params,
+            k.chars_per_word,
+            k.vdbs_params,
             )
         print("Temporary vdbs created")
         cl.user_session.set("temp_vdbs", temp_vdbs)
@@ -84,7 +85,7 @@ async def on_message(message: cl.Message):
             message.content, 
             embedding_model.get_embeddings_for_question, 
             temp_context_word_len,
-            **constants.extend_params
+            **k.extend_params
             )
         print("retrieved from temporary vdbs")
         
@@ -93,7 +94,7 @@ async def on_message(message: cl.Message):
         message.content, 
         embedding_model.get_embeddings_for_question, 
         perm_context_word_len,
-        **constants.extend_params
+        **k.extend_params
         )
     print("retrieved from permanent vdbs")
     
@@ -119,55 +120,56 @@ async def on_message(message: cl.Message):
     
     # context len adaptation
     context_len += (len(rag_context) + len(message.content))
-    while context_len > constants.max_context_len*constants.chars_per_token:
+    while context_len > k.max_context_len*k.chars_per_token:
         context_len -= len(chat[0]["content"])
         context_len -= len(chat[1]["content"])
         try:
             del chat[0:2]
         except:
             print("too long question or too much samples from docs")
-    print(f"chat and context length adapted to be less or equal then {constants.max_context_len}")       
+    print(f"chat and context length adapted to be less or equal then {k.max_context_len}")       
 
     # Generate the answer
     answer = llm_model.llm_qa(
         system + chat + [{"role": "user", "content": rag_context + message.content}],  
         train = False,
-        max_new_tokens = constants.max_new_tokens,
-        temperature = constants.temperature,
-        top_p = constants.top_p,
+        max_new_tokens = k.max_new_tokens,
+        temperature = k.temperature,
+        top_p = k.top_p,
         )
     print("answer generated")
 
-    # create pdf elements or text elements to view the sources
-    sources = []
-    temp_pdfs = []
-    for i, page in enumerate(samples["page"]):
-        file_name = samples["file_name"][i]
-        file_extension = samples["file_extension"][i]
-        if file_extension.upper() == "PDF":
-            file_path = samples["file_path"][i]
-            # the extracted page is page-1, because the func extract_page strarts from 0
-            temp_pdf = extract_page(file_path, page-1)
-            temp_pdfs.append(temp_pdf)
-            pdf_source = cl.Pdf(path=temp_pdf)
-            text_source = cl.Text(
-                content=f"**{file_name}, pagina {page}**"
-            )
-            sources.append(pdf_source)
-        else:
-            content = samples["content"][i]
-            text_source = cl.Text(
-                content=f"**{file_name}, pagina {page}**\n{content}".replace("\n\n", "\n")
-            ) 
-        sources.append(text_source)
-    msg = cl.Message('', elements=sources)
-    print(f"rag sources formatted")
+    # Create a temporary directory for PDFs
+    with tempfile.TemporaryDirectory() as temp_dir:
+        print(f"Temporary directory created: {temp_dir}")
+        sources = []
+        for i, page in enumerate(samples["page"]):
+            file_name = samples["file_name"][i]
+            file_extension = samples["file_extension"][i]
+            if file_extension.upper() == "PDF":
+                file_path = samples["file_path"][i]
+                # the extracted page is page-1, because the func extract_page strarts from 0
+                temp_pdf = extract_page(file_path, page-1, temp_dir)
+                pdf_source = cl.Pdf(path=temp_pdf)
+                text_source = cl.Text(
+                    content=f"**{file_name}, pagina {page}**"
+                )
+                sources.append(pdf_source)
+            else:
+                content = samples["content"][i]
+                text_source = cl.Text(
+                    content=f"**{file_name}, pagina {page}**\n{content}".replace("\n\n", "\n")
+                ) 
+            sources.append(text_source)
+        msg = cl.Message('', elements=sources)
+        print(f"rag sources formatted")
 
-    # send the answer
-    for i in answer:
-        await msg.stream_token(i)
-    await msg.send()
-    print("answer sent to GUI")
+        # send the answer
+        for i in answer:
+            await msg.stream_token(i)
+        await msg.send()
+        print("answer sent to GUI")
+
 
     # Update the chat and the context len
     cl.user_session.set("chat", chat + \
@@ -176,7 +178,3 @@ async def on_message(message: cl.Message):
     cl.user_session.set("context_len", context_len + len(answer))
     print("chat and context len updated with new question and answer")
     
-    # delete all temporary pdfs
-    for pdf in temp_pdfs:
-        os.remove(pdf)
-    print("removed temporary pdf for source display")

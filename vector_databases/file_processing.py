@@ -1,6 +1,8 @@
 from pptx import Presentation
 from docx import Document
+import os
 import pandas as pd
+import numpy as np
 import fitz
 import PyPDF2
 # # easyocr
@@ -151,7 +153,7 @@ def read_file(file):
             }
 
 
-def extract_page(file_path, page_number):
+def extract_page(file_path, page_number, temp_dir):
     print(f"\n    Extracting page {page_number} from {file_path}...")
 
     with open(file_path, 'rb') as input_pdf_file:
@@ -161,10 +163,82 @@ def extract_page(file_path, page_number):
         page = reader.pages[page_number]
         writer.add_page(page)
 
-        file_and_page_name = f"temporary_pdf_pag{page_number}.pdf"
+        file_and_page_name = os.path.join(temp_dir, f"temporary_pdf_pag{page_number}.pdf")
 
         with open(file_and_page_name, 'wb') as output_pdf_file:
             writer.write(output_pdf_file)
-    
+
     print(f"    page extracted\n")
     return file_and_page_name
+
+def split_in_bunches(
+    file: dict, 
+    chars_per_bunch: int, 
+    resplits: int, 
+    all_bunches_counter: int,
+    all_splits_counter: int
+    ):
+
+    bunches_content = []
+    bunches_start_page = []
+    bunches_counter = []
+    splits_counter = []
+    text = file["text"]
+
+    # split per page for excels
+    if file["file_extension"].upper() in ['XLSX', 'XLS']:
+        pages_start_char = file["pages_start_char"]
+        for page, char in enumerate(pages_start_char, start=1):
+            bunches_content.append(text[:char])
+            bunches_start_page.append(page)
+
+            # update counters
+            bunches_counter.append(all_bunches_counter)
+            splits_counter.append(all_splits_counter)
+            all_bunches_counter += 1
+        all_splits_counter += 1
+
+    # split per chars interval for every other file type
+    else:
+        pages_start_char = np.array(file["pages_start_char"]).flatten()
+        num_split_operations = resplits + 1
+
+        # if text too short, round the bunch length
+        min_bunch_over_text_ratio = num_split_operations/(2*num_split_operations-1)
+        if chars_per_bunch > len(text)*min_bunch_over_text_ratio:
+            chars_per_bunch = round(len(text)*min_bunch_over_text_ratio)
+        
+        # for every split operations
+        for _ in range(num_split_operations):
+
+            # create bunches
+            bunches_per_split_op = [text[i*chars_per_bunch:i*chars_per_bunch+chars_per_bunch] for i in range(round(len(text)/chars_per_bunch))]
+            nr_new_bunches = len(bunches_per_split_op)
+
+            # calculate start pages
+            pages_per_split_op = []
+            for i in range(len(bunches_per_split_op)):
+                distances = pages_start_char - i*chars_per_bunch
+                pages_per_split_op.append(1 + distances[distances < 0].size)
+            bunches_content += bunches_per_split_op
+            bunches_start_page += pages_per_split_op
+            
+            # prepare for next iteration
+            new_file_start = round(chars_per_bunch*1/num_split_operations)
+            text = text[new_file_start:]
+            pages_start_char = pages_start_char - new_file_start
+            pages_start_char = pages_start_char[pages_start_char > 0]
+
+            # update counters
+            bunches_counter += [i for i in range(all_bunches_counter, all_bunches_counter+nr_new_bunches)]
+            splits_counter += [all_splits_counter]*nr_new_bunches
+            all_bunches_counter += nr_new_bunches
+            all_splits_counter += 1
+        
+    return {
+        "bunches_content": bunches_content,
+        "bunches_counter": bunches_counter,
+        "splits_counter": splits_counter,
+        "bunches_start_page": bunches_start_page
+    }
+    

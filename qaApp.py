@@ -1,4 +1,4 @@
-from llm import Llm
+from LLM_inference import Llm
 
 llm_model = r'C:\Users\Sinergia EPC\LLMs\models_and_datasets\\meta-llama\\Meta-Llama-3.1-8B-Instruct'
 llm_tokenizer = r'C:\Users\Sinergia EPC\LLMs\models_and_datasets\\meta-llama\\Meta-Llama-3.1-8B-Instruct'

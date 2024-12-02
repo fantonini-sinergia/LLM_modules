@@ -1,79 +1,29 @@
+"""
+Class vdbs is a list of vector databases for retrieval augmented generation
+
+- Structure: List(HuggingFace_dataset(
+                "bunch_count": list(int) --- A counter that is incremented for each consecutive bunch of the dataset
+                "split_count": list(int) --- A counter that is incremented for each consecutive split operation of the dataset
+                "file_name": list(str) --- Name of the file the bunch was created from
+                "file_path": list(str) --- Url of the file the bunch was created from
+                "file_extension": list(str) --- Extension of the file the bunch was created from
+                "content": list(str) --- content od the bunch
+                "page": list(int) --- Page of the file the bunch was created from
+    ))
+
+- Functions for the initialization:
+    -- from_files_list
+    -- from_dir
+
+- Functions for content retrieval:
+    -- get_rag_samples
+
+"""
+
 import os
 import math
-import numpy as np
 import datasets
-from file_reading import read_file
-
-def split_in_bunches(
-        file: dict, 
-        chars_per_bunch: int, 
-        resplits: int, 
-        all_bunches_counter: int,
-        all_splits_counter: int
-        ):
-
-    bunches_content = []
-    bunches_start_page = []
-    bunches_counter = []
-    splits_counter = []
-    text = file["text"]
-
-    # split per page for excels
-    if file["file_extension"].upper() in ['XLSX', 'XLS']:
-        pages_start_char = file["pages_start_char"]
-        for page, char in enumerate(pages_start_char, start=1):
-            bunches_content.append(text[:char])
-            bunches_start_page.append(page)
-
-            # update counters
-            bunches_counter.append(all_bunches_counter)
-            splits_counter.append(all_splits_counter)
-            all_bunches_counter += 1
-        all_splits_counter += 1
-
-    # split per chars interval for every other file type
-    else:
-        pages_start_char = np.array(file["pages_start_char"]).flatten()
-        num_split_operations = resplits + 1
-
-        # if text too short, round the bunch length
-        min_bunch_over_text_ratio = num_split_operations/(2*num_split_operations-1)
-        if chars_per_bunch > len(text)*min_bunch_over_text_ratio:
-            chars_per_bunch = round(len(text)*min_bunch_over_text_ratio)
-        
-        # for every split operations
-        for _ in range(num_split_operations):
-
-            # create bunches
-            bunches_per_split_op = [text[i*chars_per_bunch:i*chars_per_bunch+chars_per_bunch] for i in range(round(len(text)/chars_per_bunch))]
-            nr_new_bunches = len(bunches_per_split_op)
-
-            # calculate start pages
-            pages_per_split_op = []
-            for i in range(len(bunches_per_split_op)):
-                distances = pages_start_char - i*chars_per_bunch
-                pages_per_split_op.append(1 + distances[distances < 0].size)
-            bunches_content += bunches_per_split_op
-            bunches_start_page += pages_per_split_op
-            
-            # prepare for next iteration
-            new_file_start = round(chars_per_bunch*1/num_split_operations)
-            text = text[new_file_start:]
-            pages_start_char = pages_start_char - new_file_start
-            pages_start_char = pages_start_char[pages_start_char > 0]
-
-            # update counters
-            bunches_counter += [i for i in range(all_bunches_counter, all_bunches_counter+nr_new_bunches)]
-            splits_counter += [all_splits_counter]*nr_new_bunches
-            all_bunches_counter += nr_new_bunches
-            all_splits_counter += 1
-        
-    return {
-        "bunches_content": bunches_content,
-        "bunches_counter": bunches_counter,
-        "splits_counter": splits_counter,
-        "bunches_start_page": bunches_start_page
-    }
+from . import file_processing
 
 def extend_bunches(
         vdb, 
@@ -111,6 +61,7 @@ class Vdbs:
             vdbs_path = None,
             ):
         self.vdbs = vdbs_list
+        self.chars_per_word = chars_per_word
         
         if vdbs_path == None:
             for i in range(len(self.vdbs)):
@@ -141,7 +92,7 @@ class Vdbs:
 
         # read every file
         for i, file in enumerate(files):
-            files[i] = {**file, **read_file(file)}
+            files[i] = {**file, **file_processing.read_file(file)}
         print(f"Readed the files")
         
         """
@@ -174,7 +125,7 @@ class Vdbs:
             for file in files:
 
                 # generate the bunches
-                bunches = split_in_bunches(
+                bunches = file_processing.split_in_bunches(
                     file = file, 
                     chars_per_bunch = chars_per_bunch,
                     resplits = vdb_params["resplits"],
