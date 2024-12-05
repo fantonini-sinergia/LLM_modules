@@ -38,14 +38,6 @@ async def on_chat_start():
     print("Embedding model initialized")
     cl.user_session.set("embedding_model", embedding_model)
 
-    # permanent vdbs loading and initialization
-    perm_vdbs = Vdbs.from_dir(
-        k.fixed_rag_data,
-        embedding_model.get_embeddings_for_vdb,
-        k.chars_per_word,
-        )
-    print("permanent vdbs loaded")
-    cl.user_session.set("perm_vdbs", perm_vdbs)
 
     # temporary vdbs initialization
     cl.user_session.set("temp_vdbs", [])
@@ -59,7 +51,6 @@ async def on_message(message: cl.Message):
     context_len = cl.user_session.get("context_len")
     llm_model = cl.user_session.get("llm_model")
     embedding_model = cl.user_session.get("embedding_model")
-    perm_vdbs = cl.user_session.get("perm_vdbs")
     temp_vdbs = cl.user_session.get("temp_vdbs")
 
     # Get attachments
@@ -81,35 +72,21 @@ async def on_message(message: cl.Message):
         cl.user_session.set("temp_vdbs", temp_vdbs)
 
         # Get the samples from the temporary vdbs
-        samples_from_temp = temp_vdbs.get_rag_samples(
-            message.content, 
-            embedding_model.get_embeddings_for_question, 
-            temp_context_word_len,
-            **k.extend_params
-            )
+        samples_from_temp = samples_from_temp = temp_vdbs[0].get_nearest_examples(
+                "embeddings", 
+                embededded_question, 
+                k = 3
+                )
         print("retrieved from temporary vdbs")
         
-    # Get the samples from the permanent vdbs
-    samples_from_perm = perm_vdbs.get_rag_samples(
-        message.content, 
-        embedding_model.get_embeddings_for_question, 
-        perm_context_word_len,
-        **k.extend_params
-        )
-    print("retrieved from permanent vdbs")
-    
-    keys = samples_from_perm[0].keys()
-    samples = {key: [] for key in keys}
-    for d in samples_from_perm:
-        for key in keys:
-            samples[key] += d[key]
-            
     if attachments:
         # Join perm and temp samples
+        keys = samples_from_temp[0].keys()
+        samples = {key: [] for key in keys}
         for d in samples_from_temp:
             for key in keys:
                 samples[key] += d[key]
-        print("joined samples from temporary and permanent vdbs")
+        print("joined samples from temporary vdbs")
 
 
     # Join sample contents into rag_context and append to the chat

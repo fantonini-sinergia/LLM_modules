@@ -22,6 +22,7 @@ Class vdbs is a list of vector databases for retrieval augmented generation
 
 import os
 import math
+import pandas as pd
 import datasets
 from . import file_processing
 
@@ -80,94 +81,99 @@ class Vdbs:
         files, 
         get_embeddings_for_vdb,
         chars_per_word,
-        vdbs_params
+        vdbs_params,
+        as_excel = False,
     ):
-        
-        """
-        original files format
-        List of dicts with args:
-            -str 'name'
-            -str 'path'
-        """
+        if as_excel:
+            excel_dbs = [pd.read_excel(f).astype(str) for f in files]
+            vdbs = [datasets.Dataset.from_pandas(db) for db in excel_dbs]
 
-        # read every file
-        for i, file in enumerate(files):
-            files[i] = {**file, **file_processing.read_file(file)}
-        print(f"Readed the files")
-        
-        """
-        new files format
-        List of dicts with args:
-            -str 'name'
-            -str 'path'
-            -str 'text'
-            -str 'file_extension'
-            -list 'pages_start_char'
-        """
+        else:
+            """
+            original files format
+            List of dicts with args:
+                -str 'name'
+                -str 'path'
+            """
 
-        # remove files without text
-        files = [file for file in files if file["text"]]
-        print("Removed files without text")
+            # read every file
+            for i, file in enumerate(files):
+                files[i] = {**file, **file_processing.read_file(file)}
+            print(f"Readed the files")
+            
+            """
+            new files format
+            List of dicts with args:
+                -str 'name'
+                -str 'path'
+                -str 'text'
+                -str 'file_extension'
+                -list 'pages_start_char'
+            """
 
-        # for every parameters set, for every file
-        vdbs = []
-        for vdb_params in vdbs_params:
-            chars_per_bunch = vdb_params["words_per_bunch"]*chars_per_word
-            content_field = []
-            page_field = []
-            file_name_field = []
-            file_path_field = []
-            file_extension_field = []
-            bunch_count_field = []
-            split_count_field = []
-            all_bunches_counter = 0
-            all_splits_counter = 0
-            for file in files:
+            # remove files without text
+            files = [file for file in files if file["text"]]
+            print("Removed files without text")
 
-                # generate the bunches
-                bunches = file_processing.split_in_bunches(
-                    file = file, 
-                    chars_per_bunch = chars_per_bunch,
-                    resplits = vdb_params["resplits"],
-                    all_bunches_counter = all_bunches_counter,
-                    all_splits_counter = all_splits_counter
-                )
-                num_bunches = len(bunches["bunches_content"])
-                print(f'generated {num_bunches} text bunches for parameters set {vdb_params}')
+            # for every parameters set, for every file
+            vdbs = []
+            for vdb_params in vdbs_params:
+                chars_per_bunch = vdb_params["words_per_bunch"]*chars_per_word
+                content_field = []
+                page_field = []
+                file_name_field = []
+                file_path_field = []
+                file_extension_field = []
+                bunch_count_field = []
+                split_count_field = []
+                all_bunches_counter = 0
+                all_splits_counter = 0
+                for file in files:
 
-                # load bunches content
-                content_field += bunches["bunches_content"]
+                    # generate the bunches
+                    bunches = file_processing.split_in_bunches(
+                        file = file, 
+                        chars_per_bunch = chars_per_bunch,
+                        resplits = vdb_params["resplits"],
+                        all_bunches_counter = all_bunches_counter,
+                        all_splits_counter = all_splits_counter
+                    )
+                    num_bunches = len(bunches["bunches_content"])
+                    print(f'generated {num_bunches} text bunches for parameters set {vdb_params}')
 
-                # load bunches counts
-                bunch_count_field += bunches["bunches_counter"]
-                all_bunches_counter = bunch_count_field[-1] + 1
+                    # load bunches content
+                    content_field += bunches["bunches_content"]
 
-                # load splits counts
-                split_count_field += bunches["splits_counter"]
-                all_splits_counter = split_count_field[-1] + 1
+                    # load bunches counts
+                    bunch_count_field += bunches["bunches_counter"]
+                    all_bunches_counter = bunch_count_field[-1] + 1
 
-                # load bunches start page
-                page_field += bunches["bunches_start_page"]
+                    # load splits counts
+                    split_count_field += bunches["splits_counter"]
+                    all_splits_counter = split_count_field[-1] + 1
 
-                # load bunches file
-                file_name_field += [file["name"]]*num_bunches
+                    # load bunches start page
+                    page_field += bunches["bunches_start_page"]
 
-                # load bunches file path
-                file_path_field += [file["path"]]*num_bunches
+                    # load bunches file
+                    file_name_field += [file["name"]]*num_bunches
 
-                # load bunches file extension
-                file_extension_field += [file["file_extension"]]*num_bunches
+                    # load bunches file path
+                    file_path_field += [file["path"]]*num_bunches
 
-            # append to the db
-            vdbs.append(datasets.Dataset.from_dict({
-                "bunch_count": bunch_count_field,
-                "split_count": split_count_field,
-                "file_name": file_name_field,
-                "file_path": file_path_field,
-                "file_extension": file_extension_field,
-                "content": content_field,
-                "page": page_field,
-                }))
+                    # load bunches file extension
+                    file_extension_field += [file["file_extension"]]*num_bunches
+
+                # append to the db
+                vdbs.append(datasets.Dataset.from_dict({
+                    "bunch_count": bunch_count_field,
+                    "split_count": split_count_field,
+                    "file_name": file_name_field,
+                    "file_path": file_path_field,
+                    "file_extension": file_extension_field,
+                    "content": content_field,
+                    "page": page_field,
+                    }))
 
         return cls(vdbs, get_embeddings_for_vdb, chars_per_word)
     
@@ -188,6 +194,21 @@ class Vdbs:
             print(f'- {len(perm_vdb["page"])}')
         print("-"*20, "\n\n")
         return cls(vdbs, get_embeddings_for_vdb, chars_per_word, vdbs_path = vdbs_path)
+    
+    @classmethod
+    def from_xlsx(
+        cls,
+        xlsx_path,
+        get_embeddings_for_vdb,
+        chars_per_word,
+    ):
+
+        df = pd.read_excel(xlsx_path)
+
+        # append to the db
+        vdbs = [datasets.Dataset.from_pandas(df)]
+
+        return cls(vdbs, get_embeddings_for_vdb, chars_per_word)
 
 
     def get_rag_samples(

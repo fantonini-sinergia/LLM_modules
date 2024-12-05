@@ -1,52 +1,28 @@
-import yaml
-import argparse
 import os
-import torch
-from transformers import AutoModel, AutoTokenizer
-from vdbs_creation import create_dbs, dbs_to_vdbs
+import fixed_vdbs_creation_constants as k
+from vector_databases.embedding import Embedding
+from vector_databases.vdbs import Vdbs
 
-parser = argparse.ArgumentParser()
-parser.add_argument("-c", "--config")
-with open(parser.parse_args().config, 'r') as yaml_file:
-    config = yaml.safe_load(yaml_file)
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
-device = torch.device(config["device"])
-embedding_model_name = 'sentence-transformers/all-MiniLM-L6-v2'
-bunches_params = config["bunches_params"]
-root_directory = config["root_directory"]
-
-# choose the vdb name and create the folder
-print("\nWhich name for the Vector Database?\n")
-vdb_name = input(">_ ")
-save_dir = f'fixed_vector_databases\\{vdb_name}'
-os.makedirs(save_dir, exist_ok=True)
-
-# Get all the files in the folder and subfolders
-file_paths = []
-for root, dirs, files in os.walk(root_directory):
+# url importing
+files = []
+for root, dirs, files in os.walk(k.source_files_path):
     for file in files:
-        file_path = os.path.join(root, file)
-        file_paths.append(file_path)
-        print(file_path)
-files = [{"name": os.path.basename(path), "path": path} for path in file_paths]
+        percorso_completo = os.path.join(root, file)
+        files.append(percorso_completo)
 
-# Create the databases (Profile "RAG")
-dbs = create_dbs(files, **bunches_params)
+# Embedding model initialization
+embedding_model_name = k.embedding_model
+embedding_model = Embedding(embedding_model_name, k.device)
+print("Embedding model initialized")
 
-# Embedding model initialization (Profile "RAG" or "RAG fissa" or "RAG fissa")
-embedding_model = AutoModel.from_pretrained(
-    embedding_model_name,
-    device_map="auto"
-)
-
-# Embedding tokenizer initialization (Profile "RAG" or "RAG fissa" or "RAG fissa")
-embedding_tokenizer = AutoTokenizer.from_pretrained(embedding_model_name)
-
-# Vectorization of the databases (Profile "RAG" or "RAG fissa" or "RAG fissa")
-vdbs = dbs_to_vdbs(dbs, embedding_model, embedding_tokenizer, device)
-
-# Save on disk
-for i, vdb in enumerate(vdbs):
-    vdb.save_faiss_index('embeddings', f'{save_dir}\\faiss_{i}.faiss')
-    vdb.drop_index('embeddings')
-    vdb.save_to_disk(f'{save_dir}\\database_{i}.hf')
+# Create vdbs
+temp_vdbs = Vdbs.from_files_list(
+    files, 
+    embedding_model.get_embeddings_for_vdb, 
+    k.chars_per_word,
+    k.vdbs_params,
+    as_excel = k.as_excel
+    )
+print("vdbs created")
