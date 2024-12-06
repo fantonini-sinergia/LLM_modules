@@ -1,5 +1,4 @@
-device = "cuda"
-
+# chat constants
 system = [
     {
         "role": "system",
@@ -13,36 +12,35 @@ system = [
         ),
     }
 ]
-
-models_path = r'C:\Users\Sinergia EPC\LLMs\models_and_datasets'
-
-llm_model = "meta-llama\\Meta-Llama-3.1-8B-Instruct"
-llm_tokenizer = "meta-llama\\Meta-Llama-3.1-8B-Instruct"
-
-embedding_model = 'sentence-transformers/all-MiniLM-L6-v2'
-
-max_context_len = 2800
+chars_per_token = 4
 rag_context_word_len = 1800
+max_context_len = 2800
 perm_context_ratio = 0.2
 
+# llm constants
+models_path = r'C:\Users\Sinergia EPC\LLMs\models_and_datasets'
+llm_model = "meta-llama\\Meta-Llama-3.1-8B-Instruct"
+llm_tokenizer = "meta-llama\\Meta-Llama-3.1-8B-Instruct"
 bnb_config = {
     "load_in_4bit": True,
     "bnb_4bit_compute_dtype": "float16",
     "bnb_4bit_quant_type": "nf4",
     "bnb_4bit_use_double_quant": False
 }
-
 max_new_tokens = 2048
 temperature = 0.6
 top_p = 0.9
 
-embedding_model_name = "sentence-transformers\\all-MiniLM-L6-v2"
+# embedding model constants
+embedding_model = 'sentence-transformers/all-MiniLM-L6-v2'
+embedding_model_name = "sentence-transformers\\all-MiniLM-L6-v2" # still not used
+device = "cuda"
 
-fixed_rag_data = r'C:\Users\Sinergia EPC\LLMs\chatbot\fixed_vector_databases\FAB_M004_manuali'
+# permanent vdbs constants
+perm_vdbs_folder = r'C:\Users\Sinergia EPC\LLMs\chatbot\fixed_vector_databases\FAB_M004_manuali'
 
+# temporary vdbs constants
 chars_per_word = 5
-chars_per_token = 4
-
 vdbs_params = [
     {
         "words_per_bunch": 600,
@@ -53,8 +51,6 @@ vdbs_params = [
         "resplits": 2
     }
 ]
-
-
 extend_params = {
     "add_words": 300,
     "add_words_nr_word_thr": 150

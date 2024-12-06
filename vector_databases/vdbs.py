@@ -21,10 +21,11 @@ Class vdbs is a list of vector databases for retrieval augmented generation
 """
 
 import os
+import json
 import math
 import pandas as pd
 import datasets
-from . import file_processing
+import file_processing
 
 def extend_bunches(
         vdb, 
@@ -53,26 +54,54 @@ def extend_bunches(
         
     return nearest_exs
 
-class Vdbs:
+class Vdbs(list):
     def __init__(
             self, 
             vdbs_list,
             get_embeddings_for_vdb,
             chars_per_word,
+            as_excel,
+            vect_columns,
             vdbs_path = None,
             ):
         self.vdbs = vdbs_list
         self.chars_per_word = chars_per_word
-        
-        if vdbs_path == None:
-            for i in range(len(self.vdbs)):
-                self.vdbs[i] = self.vdbs[i].map(
-                        lambda x: {"embeddings": get_embeddings_for_vdb(x["content"])}
-                ).add_faiss_index(column="embeddings")
+        if as_excel:
+            self.vect_columns = vect_columns
+            if (vect_columns) == 0:
+                vect_columns = self.vdbs[0].column_names
+            if vdbs_path == None:
+                # New vdbs as excels
+                for i, vdb in enumerate(self.vdbs):
+                    print("\ncolumn names before vectorization\n", self.vdbs[i].column_names)
+                    self.vdbs[i] = vdb.map(
+                            lambda x: {f"{col}_embed": get_embeddings_for_vdb(x[col]) for col in vect_columns}
+                    )
+                    # self.vdbs[i] = vdb.map(
+                    #         lambda batch: {f"{col}_embed": [get_embeddings_for_vdb(val) for val in batch[col]] for col in vect_columns},
+                    #         batched=True
+                    #     )
+                    print("\ncolumn names after vectorization\n", self.vdbs[i].column_names)
+                    for col in vect_columns:
+                        self.vdbs[i] = self.vdbs[i].add_faiss_index(column=f"{col}_embed")
+            else:
+                # Loaded vdbs as excels
+                for i, _ in enumerate(self.vdbs):
+                    for col in vect_columns:
+                        self.vdbs[i].load_faiss_index(f"{col}_embed", f'{vdbs_path}\\{i}_{col}_embed.faiss')
         else:
-            for i, vdb in enumerate(self.vdbs):
-                vdb.load_faiss_index('embeddings', f'{vdbs_path}\\faiss_{i}.faiss')
-
+            if vdbs_path == None:
+                # New vdbs as raw files
+                for i, vdb in enumerate(self.vdbs):
+                    print("\ncolumn names before vectorization\n", self.vdbs[i].column_names)
+                    self.vdbs[i] = vdb.map(
+                            lambda x: {"embeddings": get_embeddings_for_vdb(x["content"])}
+                    ).add_faiss_index(column="embeddings")
+                    print("\ncolumn names before vectorization\n", self.vdbs[i].column_names)
+            else:
+                # Loaded vdbs as row files
+                for i, _ in enumerate(self.vdbs):
+                    self.vdbs[i].load_faiss_index('embeddings', f'{vdbs_path}\\faiss_{i}.faiss')
         print("databases turned into vector databases")
 
     @classmethod
@@ -82,13 +111,14 @@ class Vdbs:
         get_embeddings_for_vdb,
         chars_per_word,
         vdbs_params,
-        as_excel = False,
+        as_excel,
+        vect_columns,
     ):
         if as_excel:
-            excel_dbs = [pd.read_excel(f).astype(str) for f in files]
+            excel_dbs = [pd.read_excel(f["path"]).astype(str) for f in files]
             vdbs = [datasets.Dataset.from_pandas(db) for db in excel_dbs]
 
-        else:
+        elif(chars_per_word > 0):
             """
             original files format
             List of dicts with args:
@@ -174,42 +204,36 @@ class Vdbs:
                     "content": content_field,
                     "page": page_field,
                     }))
-
-        return cls(vdbs, get_embeddings_for_vdb, chars_per_word)
+        else:
+            raise ValueError("Missing parameters for vdbs creation")
+        return cls(
+            vdbs, 
+            get_embeddings_for_vdb, 
+            chars_per_word,
+            as_excel,
+            vect_columns,
+            )
     
     @classmethod
     def from_dir(
         cls,
         vdbs_path,
         get_embeddings_for_vdb,
-        chars_per_word
         ):
-        
         vdbs = []
         for dir in os.listdir(vdbs_path):
             if "database" in dir:
                 vdbs.append(datasets.Dataset.load_from_disk(os.path.join(vdbs_path, dir)))
-        print(f'Loaded {len(vdbs)} Databases. Number of bunches per db:')
-        for perm_vdb in vdbs:
-            print(f'- {len(perm_vdb["page"])}')
-        print("-"*20, "\n\n")
-        return cls(vdbs, get_embeddings_for_vdb, chars_per_word, vdbs_path = vdbs_path)
-    
-    @classmethod
-    def from_xlsx(
-        cls,
-        xlsx_path,
-        get_embeddings_for_vdb,
-        chars_per_word,
-    ):
-
-        df = pd.read_excel(xlsx_path)
-
-        # append to the db
-        vdbs = [datasets.Dataset.from_pandas(df)]
-
-        return cls(vdbs, get_embeddings_for_vdb, chars_per_word)
-
+        with open(f"{vdbs_path}\\parameters.json", "r") as file:
+            parameters = json.load(file)
+        return cls(
+            vdbs, 
+            get_embeddings_for_vdb, 
+            parameters.chars_per_word,
+            parameters.as_excel,
+            parameters.vect_columns,
+            vdbs_path = vdbs_path,
+            )
 
     def get_rag_samples(
             self,

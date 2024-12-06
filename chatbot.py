@@ -40,9 +40,8 @@ async def on_chat_start():
 
     # permanent vdbs loading and initialization
     perm_vdbs = Vdbs.from_dir(
-        k.fixed_rag_data,
+        k.perm_vdbs_folder,
         embedding_model.get_embeddings_for_vdb,
-        k.chars_per_word,
         )
     print("permanent vdbs loaded")
     cl.user_session.set("perm_vdbs", perm_vdbs)
