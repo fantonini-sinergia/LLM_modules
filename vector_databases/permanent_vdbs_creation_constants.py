@@ -21,7 +21,3 @@ vdbs_params = [
         "resplits": 2
     }
 ]
-extend_params = {
-    "add_words": 300,
-    "add_words_nr_word_thr": 150
-}

@@ -51,6 +51,8 @@ vdbs_params = [
         "resplits": 2
     }
 ]
+
+# extension of the sample
 extend_params = {
     "add_words": 300,
     "add_words_nr_word_thr": 150

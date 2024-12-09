@@ -266,20 +266,20 @@ class Vdbs(list):
         """
 
         # calculate the number of bunches to be retrieved (decimal, same for all vdbs)
-        words_per_bunch_per_vdb = [len(vdb["content"][0])/self.chars_per_word for vdb in self]
-        add_bunches_per_vdb = []
-        for i, _ in enumerate(words_per_bunch_per_vdb):
-            if words_per_bunch_per_vdb[i] < add_words_nr_word_thr:
-                add_bunches = int(add_words/words_per_bunch_per_vdb[i])
-                words_per_bunch_per_vdb[i] += add_bunches*words_per_bunch_per_vdb[i]
-                add_bunches_per_vdb.append(add_bunches)
+        words_per_bunch = [len(vdb["content"][0])/self.chars_per_word for vdb in self]
+        add_bunches = []
+        for i, _ in enumerate(words_per_bunch):
+            if words_per_bunch[i] < add_words_nr_word_thr:
+                add_bunches = int(add_words/words_per_bunch[i])
+                words_per_bunch[i] += add_bunches*words_per_bunch[i]
+                add_bunches.append(add_bunches)
             else:
-                add_bunches_per_vdb.append(False)
-        nr_retrieved = context_word_len/sum(words_per_bunch_per_vdb)
+                add_bunches.append(False)
+        nr_retrieved = context_word_len/sum(words_per_bunch)
 
         # calculate how many words to take for the last sample of every db
         ratio_last_bunch_per_vdb = nr_retrieved - int(nr_retrieved)
-        words_in_last_bunch_per_vdb = [int(w*ratio_last_bunch_per_vdb) for w in words_per_bunch_per_vdb]
+        words_in_last_bunch_per_vdb = [int(w*ratio_last_bunch_per_vdb) for w in words_per_bunch]
 
         
         # embed the question
@@ -302,7 +302,7 @@ class Vdbs(list):
             nearest_exs = extend_bunches(
                 vdb, 
                 nearest_exs, 
-                add_bunches_per_vdb[i]
+                add_bunches[i]
                 )
             
             # cut the last sample of every vdb
