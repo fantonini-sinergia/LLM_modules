@@ -32,6 +32,7 @@ vdbs = Vdbs.from_files_list(
     as_excel = k.as_excel,
     vect_columns = k.vect_columns,
     )
+print(vdbs[0].column_names)
 print("vdbs created")
 
 # Save on disk
@@ -39,19 +40,22 @@ save_dir = Path(k.save_dir)
 save_dir.mkdir(parents=True, exist_ok=True)
 if k.as_excel:
     for i, vdb in enumerate(vdbs):
-        for col in k.vect_columns:
-            faiss_file = save_dir / f'{i}_{col}_embed.faiss'
-            vdb.save_faiss_index(f"{col}_embed", faiss_file)
-            vdb.drop_index(f"{col}_embed")
-        vdb_file = save_dir / f'vdb_{i}.hf'
-        vdb.save_to_disk(vdb_file)
+        vectorized_columns = vdb.list_indexes()
+        for vect_col in vectorized_columns:
+            faiss_file = save_dir / f'{i}_{vect_col}.faiss'
+            vdb.save_faiss_index(f"{vect_col}", faiss_file)
+            vdb.drop_index(f"{vect_col}")
+        vdb_file = f'vdb_{i}.hf'
+        vdb_path = os.path.join(save_dir,vdb_file)
+        vdb.save_to_disk(vdb_path)
 else:
     for i, vdb in enumerate(vdbs):
         faiss_file = save_dir / f'{i}.faiss'
         vdb.save_faiss_index('embeddings', faiss_file)
         vdb.drop_index('embeddings')
-        vdb_file = save_dir / f'vdb_{i}.hf'
-        vdb.save_to_disk(vdb_file)
+        vdb_file = f'vdb_{i}.hf'
+        vdb_path = os.path.join(save_dir,vdb_file)
+        vdb.save_to_disk(vdb_path)
 
 parameters = {
     'as_excel': k.as_excel,

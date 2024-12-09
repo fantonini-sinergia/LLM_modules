@@ -64,44 +64,60 @@ class Vdbs(list):
             vect_columns,
             vdbs_path = None,
             ):
-        self.vdbs = vdbs_list
+        super().__init__(vdbs_list)
         self.chars_per_word = chars_per_word
+        self.get_embeddings_for_vdb = get_embeddings_for_vdb
+        self.as_excel = as_excel
+        self.vect_columns = vect_columns
+        self.vdbs_path = vdbs_path
         if as_excel:
-            self.vect_columns = vect_columns
-            if (vect_columns) == 0:
-                vect_columns = self.vdbs[0].column_names
+            if len(vect_columns) == 0:
+                vect_columns = self[0].column_names
             if vdbs_path == None:
                 # New vdbs as excels
-                for i, vdb in enumerate(self.vdbs):
-                    print("\ncolumn names before vectorization\n", self.vdbs[i].column_names)
-                    self.vdbs[i] = vdb.map(
-                            lambda x: {f"{col}_embed": get_embeddings_for_vdb(x[col]) for col in vect_columns}
-                    )
-                    # self.vdbs[i] = vdb.map(
-                    #         lambda batch: {f"{col}_embed": [get_embeddings_for_vdb(val) for val in batch[col]] for col in vect_columns},
-                    #         batched=True
-                    #     )
-                    print("\ncolumn names after vectorization\n", self.vdbs[i].column_names)
+                for i, vdb in enumerate(self):
+                    print("\ncolumn names before vectorization\n", vect_columns)
+                    # for col in vect_columns:
+                    #     self[i] = self[i].map(
+                    #             lambda x: {f"{col}_embed": get_embeddings_for_vdb(x[col])}
+                    #     ).add_faiss_index(column=f"{col}_embed")
+
+                    # def embed_batch(batch):
+                    #     result = {}
+                    #     for col in vect_columns:
+                    #         result[f"{col}_embed"] = get_embeddings_for_vdb(batch[col])
+                    #     return result
+
+                    # self[i] = self[i].map(embed_batch, batched=True)
+
+                    # self[i] = vdb.map(
+                    #         lambda x: {f"{col}_embed": get_embeddings_for_vdb(x[col]) for col in vect_columns}
+                    # )
+                    self[i] = vdb.map(
+                            lambda batch: {f"{col}_embed": [get_embeddings_for_vdb(val) for val in batch[col]] for col in vect_columns},
+                            batched=True
+                        )
+                    print("\ncolumn names after vectorization\n", self[i].column_names)
                     for col in vect_columns:
-                        self.vdbs[i] = self.vdbs[i].add_faiss_index(column=f"{col}_embed")
+                        self[i] = self[i].add_faiss_index(column=f"{col}_embed")
             else:
                 # Loaded vdbs as excels
-                for i, _ in enumerate(self.vdbs):
+                for i, _ in enumerate(self):
                     for col in vect_columns:
-                        self.vdbs[i].load_faiss_index(f"{col}_embed", f'{vdbs_path}\\{i}_{col}_embed.faiss')
+                        self[i].load_faiss_index(f"{col}_embed", f'{vdbs_path}\\{i}_{col}_embed.faiss')
         else:
             if vdbs_path == None:
                 # New vdbs as raw files
-                for i, vdb in enumerate(self.vdbs):
-                    print("\ncolumn names before vectorization\n", self.vdbs[i].column_names)
-                    self.vdbs[i] = vdb.map(
+                for i, vdb in enumerate(self):
+                    print("\ncolumn names before vectorization\n", self[i].column_names)
+                    self[i] = vdb.map(
                             lambda x: {"embeddings": get_embeddings_for_vdb(x["content"])}
                     ).add_faiss_index(column="embeddings")
-                    print("\ncolumn names before vectorization\n", self.vdbs[i].column_names)
+                    print("\ncolumn names before vectorization\n", self[i].column_names)
             else:
                 # Loaded vdbs as row files
-                for i, _ in enumerate(self.vdbs):
-                    self.vdbs[i].load_faiss_index('embeddings', f'{vdbs_path}\\faiss_{i}.faiss')
+                for i, _ in enumerate(self):
+                    self[i].load_faiss_index('embeddings', f'{vdbs_path}\\faiss_{i}.faiss')
         print("databases turned into vector databases")
 
     @classmethod
@@ -250,7 +266,7 @@ class Vdbs(list):
         """
 
         # calculate the number of bunches to be retrieved (decimal, same for all vdbs)
-        words_per_bunch_per_vdb = [len(vdb["content"][0])/self.chars_per_word for vdb in self.vdbs]
+        words_per_bunch_per_vdb = [len(vdb["content"][0])/self.chars_per_word for vdb in self]
         add_bunches_per_vdb = []
         for i, _ in enumerate(words_per_bunch_per_vdb):
             if words_per_bunch_per_vdb[i] < add_words_nr_word_thr:
@@ -271,7 +287,7 @@ class Vdbs(list):
         print("Question embedded")
 
         samples_per_vdb = []
-        for i, vdb in enumerate(self.vdbs):
+        for i, vdb in enumerate(self):
             
             # retrieve the samples for every vdb
             int_nr_retrieved = math.ceil(nr_retrieved)

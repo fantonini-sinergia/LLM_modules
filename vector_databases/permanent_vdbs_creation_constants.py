@@ -1,12 +1,12 @@
-# source_files_path = r'C:\Users\Sinergia EPC\IDEALE\ontologia'
-# save_dir = r'C:\Users\Sinergia EPC\LLM_modules\vector_databases\permanent_vdbs\IDEALE\test_ontologia'
-source_files_path = r'C:\Users\Sinergia EPC\IDEALE\ontologi'
-save_dir = r'C:\Users\Sinergia EPC\LLM_modules\vector_databases\permanent_vdbs\IDEALE\test_ontologi'
+source_files_path = r'C:\Users\Sinergia EPC\IDEALE\ontologia'
+save_dir = r'C:\Users\Sinergia EPC\LLM_modules\vector_databases\permanent_vdbs\IDEALE\test_ontologia'
+# source_files_path = r'C:\Users\Sinergia EPC\IDEALE\ontologi'
+# save_dir = r'C:\Users\Sinergia EPC\LLM_modules\vector_databases\permanent_vdbs\IDEALE\test_ontologi'
 
 embedding_model = 'sentence-transformers/all-MiniLM-L6-v2'
 device = "cuda"
 
-as_excel = False
+as_excel = True
 # only for as_excel = True
 vect_columns = []
 # only for as_excel = False
