@@ -25,7 +25,7 @@ import json
 import math
 import pandas as pd
 import datasets
-import file_processing
+from vector_databases import file_processing
 
 def extend_bunches(
         vdb, 
@@ -54,85 +54,94 @@ def extend_bunches(
         
     return nearest_exs
 
-class Vdbs(list):
+class Vdbs():
     def __init__(
             self, 
-            vdbs_list,
+            dbs,
             get_embeddings_for_vdb,
-            chars_per_word,
-            as_excel,
             vect_columns,
+            chars_per_word,
+            as_excel = False,
             vdbs_path = None,
+            add_words = 0,
+            add_words_nr_word_thr = 0,
             ):
-        super().__init__(vdbs_list)
-        self.chars_per_word = chars_per_word
+        self.vdbs = []
         self.get_embeddings_for_vdb = get_embeddings_for_vdb
+        self.chars_per_word = chars_per_word
         self.as_excel = as_excel
-        self.vect_columns = vect_columns
-        self.vdbs_path = vdbs_path
-        if as_excel:
+        if self.as_excel:
+            print(vect_columns)
             if len(vect_columns) == 0:
-                vect_columns = self[0].column_names
+                vect_columns = self.vdbs[0].column_names
+            print('Columns to be vectorized: ', vect_columns)
             if vdbs_path == None:
                 # New vdbs as excels
-                for i, vdb in enumerate(self):
-                    print("\ncolumn names before vectorization\n", vect_columns)
-                    # for col in vect_columns:
-                    #     self[i] = self[i].map(
-                    #             lambda x: {f"{col}_embed": get_embeddings_for_vdb(x[col])}
-                    #     ).add_faiss_index(column=f"{col}_embed")
-
-                    # def embed_batch(batch):
-                    #     result = {}
-                    #     for col in vect_columns:
-                    #         result[f"{col}_embed"] = get_embeddings_for_vdb(batch[col])
-                    #     return result
-
-                    # self[i] = self[i].map(embed_batch, batched=True)
-
-                    # self[i] = vdb.map(
-                    #         lambda x: {f"{col}_embed": get_embeddings_for_vdb(x[col]) for col in vect_columns}
-                    # )
-                    self[i] = vdb.map(
-                            lambda batch: {f"{col}_embed": [get_embeddings_for_vdb(val) for val in batch[col]] for col in vect_columns},
+                for db in dbs:
+                    vdb = db.map(
+                            lambda batch: {f"{col}_embed": [
+                                    get_embeddings_for_vdb(val) for val in batch[col]
+                                    ] for col in vect_columns},
                             batched=True
                         )
-                    print("\ncolumn names after vectorization\n", self[i].column_names)
                     for col in vect_columns:
-                        self[i] = self[i].add_faiss_index(column=f"{col}_embed")
+                        vdb = vdb.add_faiss_index(column=f"{col}_embed")
+                    print('New columns: ', vdb.list_indexes())
+                    self.vdbs.append(vdb)
             else:
                 # Loaded vdbs as excels
-                for i, _ in enumerate(self):
+                for i, db in enumerate(dbs):
+                    vdb = db
                     for col in vect_columns:
-                        self[i].load_faiss_index(f"{col}_embed", f'{vdbs_path}\\{i}_{col}_embed.faiss')
+                        vdb.load_faiss_index(
+                            f"{col}_embed", 
+                            os.path.join(vdbs_path, f'{i}_{col}_embed.faiss')
+                            )
+                    self.vdbs.append(vdb)
         else:
             if vdbs_path == None:
                 # New vdbs as raw files
-                for i, vdb in enumerate(self):
-                    print("\ncolumn names before vectorization\n", self[i].column_names)
-                    self[i] = vdb.map(
+                for db in dbs:
+                    vdb = db.map(
                             lambda x: {"embeddings": get_embeddings_for_vdb(x["content"])}
                     ).add_faiss_index(column="embeddings")
-                    print("\ncolumn names before vectorization\n", self[i].column_names)
+                    self.vdbs.append(vdb)
             else:
-                # Loaded vdbs as row files
-                for i, _ in enumerate(self):
-                    self[i].load_faiss_index('embeddings', f'{vdbs_path}\\faiss_{i}.faiss')
+                # Loaded vdbs as raw files
+                for i, db in enumerate(dbs):
+                    vdb = db
+                    vdb.load_faiss_index(
+                        'embeddings', 
+                        os.path.join(vdbs_path, f'faiss_{i}.faiss')
+                        )
+                self.vdbs.append(vdb)
+            # Calculate how many words a bunch is long
+            self.words_per_bunch = [len(vdb["content"][0])/self.chars_per_word for vdb in self.vdbs]
+            # Calculate how many bunches to add to each one retrieved
+            self.add_bunches = []
+            for i, _ in enumerate(self.words_per_bunch):
+                if self.words_per_bunch[i] < add_words_nr_word_thr:
+                    add_bunches = int(add_words/self.words_per_bunch[i])
+                    self.words_per_bunch[i] += add_bunches*self.words_per_bunch[i]
+                    self.add_bunches.append(add_bunches)
+                else:
+                    self.add_bunches.append(False)
         print("databases turned into vector databases")
 
     @classmethod
     def from_files_list(
         cls,
-        files, 
+        files,
         get_embeddings_for_vdb,
-        chars_per_word,
-        vdbs_params,
-        as_excel,
         vect_columns,
+        chars_per_word,
+        as_excel = False,
+        vdbs_params = None,
+        **kwargs,
     ):
         if as_excel:
             excel_dbs = [pd.read_excel(f["path"]).astype(str) for f in files]
-            vdbs = [datasets.Dataset.from_pandas(db) for db in excel_dbs]
+            dbs = [datasets.Dataset.from_pandas(db) for db in excel_dbs]
 
         elif(chars_per_word > 0):
             """
@@ -162,7 +171,7 @@ class Vdbs(list):
             print("Removed files without text")
 
             # for every parameters set, for every file
-            vdbs = []
+            dbs = []
             for vdb_params in vdbs_params:
                 chars_per_bunch = vdb_params["words_per_bunch"]*chars_per_word
                 content_field = []
@@ -211,7 +220,7 @@ class Vdbs(list):
                     file_extension_field += [file["file_extension"]]*num_bunches
 
                 # append to the db
-                vdbs.append(datasets.Dataset.from_dict({
+                dbs.append(datasets.Dataset.from_dict({
                     "bunch_count": bunch_count_field,
                     "split_count": split_count_field,
                     "file_name": file_name_field,
@@ -223,11 +232,12 @@ class Vdbs(list):
         else:
             raise ValueError("Missing parameters for vdbs creation")
         return cls(
-            vdbs, 
-            get_embeddings_for_vdb, 
+            dbs,
+            get_embeddings_for_vdb,
+            vect_columns,
             chars_per_word,
             as_excel,
-            vect_columns,
+            **kwargs
             )
     
     @classmethod
@@ -235,81 +245,94 @@ class Vdbs(list):
         cls,
         vdbs_path,
         get_embeddings_for_vdb,
+        **kwargs,
         ):
-        vdbs = []
+        dbs = []
         for dir in os.listdir(vdbs_path):
-            if "database" in dir:
-                vdbs.append(datasets.Dataset.load_from_disk(os.path.join(vdbs_path, dir)))
-        with open(f"{vdbs_path}\\parameters.json", "r") as file:
+            if ".hf" in dir:
+                dbs.append(datasets.Dataset.load_from_disk(os.path.join(vdbs_path, dir)))
+                print(f"\n\nthat's the dir\n{dir}\n\n")
+            else:
+                print(f"\n\nthis is not a dir\n{dir}\n\n")
+        with open(os.path.join(vdbs_path,"parameters.json"), "r") as file:
             parameters = json.load(file)
         return cls(
-            vdbs, 
+            dbs, 
             get_embeddings_for_vdb, 
-            parameters.chars_per_word,
-            parameters.as_excel,
-            parameters.vect_columns,
+            parameters["vect_columns"],
+            parameters["chars_per_word"],
+            as_excel = parameters["as_excel"],
             vdbs_path = vdbs_path,
+            **kwargs,
             )
 
     def get_rag_samples(
             self,
             text,
             get_embeddings_for_question, 
-            context_word_len,
-            add_words,
-            add_words_nr_word_thr
+            context_word_len = None,
             ):
 
         """
         args:
         - 
         """
-
-        # calculate the number of bunches to be retrieved (decimal, same for all vdbs)
-        words_per_bunch = [len(vdb["content"][0])/self.chars_per_word for vdb in self]
-        add_bunches = []
-        for i, _ in enumerate(words_per_bunch):
-            if words_per_bunch[i] < add_words_nr_word_thr:
-                add_bunches = int(add_words/words_per_bunch[i])
-                words_per_bunch[i] += add_bunches*words_per_bunch[i]
-                add_bunches.append(add_bunches)
-            else:
-                add_bunches.append(False)
-        nr_retrieved = context_word_len/sum(words_per_bunch)
-
-        # calculate how many words to take for the last sample of every db
-        ratio_last_bunch_per_vdb = nr_retrieved - int(nr_retrieved)
-        words_in_last_bunch_per_vdb = [int(w*ratio_last_bunch_per_vdb) for w in words_per_bunch]
-
-        
         # embed the question
         embededded_question = get_embeddings_for_question(text)
         print("Question embedded")
 
-        samples_per_vdb = []
-        for i, vdb in enumerate(self):
-            
-            # retrieve the samples for every vdb
-            int_nr_retrieved = math.ceil(nr_retrieved)
-            _, nearest_exs = vdb.get_nearest_examples(
-                "embeddings", 
-                embededded_question, 
-                k = int_nr_retrieved
-                )
-            print(f'Retrieved {int_nr_retrieved} samples for vdb nr {i + 1}')
-            
-            # extend the samples of every vdb
-            nearest_exs = extend_bunches(
-                vdb, 
-                nearest_exs, 
-                add_bunches[i]
-                )
-            
-            # cut the last sample of every vdb
-            chars_in_last_bunch = words_in_last_bunch_per_vdb[i]*self.chars_per_word
-            nearest_exs["content"][-1] = nearest_exs["content"][-1][:chars_in_last_bunch]
-            print(f"The last sample has been cut to {words_in_last_bunch_per_vdb[i]} words")
+        if self.as_excel:
+            samples_per_vdb = []
+            samples = pd.DataFrame()
+            for i, vdb in enumerate(self.vdbs):
+                for vect_columns in vdb.list_indexes():
+                    sc, sa = vdb.get_nearest_examples(
+                        vect_columns, 
+                        embededded_question, 
+                        k = 3
+                        )
+                    sa = pd.DataFrame.from_dict(sa)
+                    sa['scores'] = sc
+                    samples = pd.concat([samples, sa], ignore_index=True)
+                samples = samples.sort_values(by='scores')[:3]
+                print(samples)
+                samples_per_vdb.append(
+                    samples.drop(columns='scores').to_dict(orient='list')
+                    )
 
-            samples_per_vdb.append(nearest_exs)
+        else:
+
+            # calculate the number of bunches to retrieve from each vdb
+            nr_retrieved = context_word_len/sum(self.words_per_bunch)
+
+            # calculate how many words to take for the last sample
+            ratio_last_bunch = nr_retrieved - int(nr_retrieved)
+            words_in_last_bunch = [int(w*ratio_last_bunch) for w in self.words_per_bunch]
+
+            samples_per_vdb = []
+            for i, vdb in enumerate(self.vdbs):
+                
+                # retrieve the samples for every vdb
+                int_nr_retrieved = math.ceil(nr_retrieved)
+                _, nearest_exs = vdb.get_nearest_examples(
+                    "embeddings", 
+                    embededded_question, 
+                    k = int_nr_retrieved
+                    )
+                print(f'Retrieved {int_nr_retrieved} samples for vdb nr {i + 1}')
+                
+                # extend the samples of every vdb
+                nearest_exs = extend_bunches(
+                    vdb, 
+                    nearest_exs, 
+                    self.add_bunches[i]
+                    )
+                
+                # cut the last sample of every vdb
+                chars_in_last_bunch = words_in_last_bunch[i]*self.chars_per_word
+                nearest_exs["content"][-1] = nearest_exs["content"][-1][:chars_in_last_bunch]
+                print(f"The last sample has been cut to {words_in_last_bunch[i]} words")
+
+                samples_per_vdb.append(nearest_exs)
 
         return samples_per_vdb

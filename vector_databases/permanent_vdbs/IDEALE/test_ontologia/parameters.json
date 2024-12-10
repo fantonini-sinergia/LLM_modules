@@ -1,1 +1,1 @@
-{"as_excel": true, "vect_columns": [], "chars_per_word": 5, "vdbs_params": [{"words_per_bunch": 600, "resplits": 2}, {"words_per_bunch": 100, "resplits": 2}], "extend_params": {"add_words": 300, "add_words_nr_word_thr": 150}}
+{"as_excel": true, "vect_columns": ["macro_category", "category", "description", "sub_category", "url", "tags"], "chars_per_word": 5, "vdbs_params": [{"words_per_bunch": 600, "resplits": 2}, {"words_per_bunch": 100, "resplits": 2}], "extend_params": {"add_words": 300, "add_words_nr_word_thr": 150}}
