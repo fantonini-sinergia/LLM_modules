@@ -87,12 +87,12 @@ async def on_message(message: cl.Message):
     #     print("joined samples from temporary and permanent vdbs")      
 
     # Create and send the answer
-    msg = cl.Message(content = f'Ecco cosa ho trovato\
-                     \nmacro_category: {samples["macro_category"]}\
-                     \ncategory: {samples["category"]}\
-                     \ndescription: {samples["description"]}\
-                     \nsub_category: {samples["sub_category"]}\
-                     \nurl: {samples["url"]}\
-                     \ntags: {samples["tags"]}')
+    content = f'Ecco cosa ho trovato:'
+    for i in range(len(list(samples.values())[0])):
+        content += f'\n\n'
+        for k in samples.keys():
+            if k not in perm_vdbs.vdbs[0].list_indexes():
+                content += f'\n{k}: {samples[k][i]}'
+    msg = cl.Message(content = content)
     await msg.send()
     print("answer sent to GUI")

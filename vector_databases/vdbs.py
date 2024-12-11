@@ -285,14 +285,15 @@ class Vdbs():
             samples_per_vdb = []
             samples = pd.DataFrame()
             for i, vdb in enumerate(self.vdbs):
-                for vect_columns in vdb.list_indexes():
+                for vect_col in vdb.list_indexes():
                     sc, sa = vdb.get_nearest_examples(
-                        vect_columns, 
+                        vect_col, 
                         embededded_question, 
                         k = 3
                         )
                     sa = pd.DataFrame.from_dict(sa)
                     sa['scores'] = sc
+                    sa['from'] = [vect_col]*len(sc)
                     samples = pd.concat([samples, sa], ignore_index=True)
                 samples = samples.sort_values(by='scores')[:3]
                 print(samples)
