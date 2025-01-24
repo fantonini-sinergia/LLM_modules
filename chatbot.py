@@ -42,6 +42,7 @@ async def on_chat_start():
     perm_vdbs = Vdbs.from_dir(
         k.perm_vdbs_folder,
         embedding_model.get_embeddings_for_vdb,
+        **k.extend_params,
         )
     print("permanent vdbs loaded")
     cl.user_session.set("perm_vdbs", perm_vdbs)
@@ -75,6 +76,7 @@ async def on_message(message: cl.Message):
             embedding_model.get_embeddings_for_vdb, 
             k.chars_per_word,
             k.vdbs_params,
+            **k.extend_params,
             )
         print("Temporary vdbs created")
         cl.user_session.set("temp_vdbs", temp_vdbs)
@@ -84,7 +86,6 @@ async def on_message(message: cl.Message):
             message.content, 
             embedding_model.get_embeddings_for_question, 
             temp_context_word_len,
-            **k.extend_params
             )
         print("retrieved from temporary vdbs")
         
@@ -93,7 +94,6 @@ async def on_message(message: cl.Message):
         message.content, 
         embedding_model.get_embeddings_for_question, 
         perm_context_word_len,
-        **k.extend_params
         )
     print("retrieved from permanent vdbs")
     
