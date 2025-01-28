@@ -27,9 +27,9 @@ print("Embedding model initialized")
 vdbs = Vdbs.from_files_list(
     files, 
     embedding_model.get_embeddings_for_vdb, 
-    k.chars_per_word,
-    k.vdbs_params,
-    as_excel = k.as_excel,
+    k.as_excel,
+    chars_per_word = k.chars_per_word,
+    vdbs_params = k.vdbs_params,
     vect_columns = k.vect_columns,
     )
 print(vdbs[0].column_names)

@@ -37,7 +37,7 @@ embedding_model_name = "sentence-transformers\\all-MiniLM-L6-v2" # still not use
 device = "cuda"
 
 # permanent vdbs constants
-perm_vdbs_folder = r'C:\Users\Sinergia EPC\LLMs\chatbot\fixed_vector_databases\FAB_M004_manuali'
+perm_vdbs_folder = r'C:\Users\Sinergia EPC\LLM_modules\vector_databases\permanent_vdbs\FAB_M004_manuali'
 
 # temporary vdbs constants
 chars_per_word = 5

@@ -59,22 +59,20 @@ class Vdbs():
             self, 
             dbs,
             get_embeddings_for_vdb,
-            vect_columns,
-            chars_per_word,
-            as_excel = False,
-            vdbs_path = None,
-            add_words = 0,
-            add_words_nr_word_thr = 0,
+            as_excel,
+            vdbs_path,
+            **kwargs,
             ):
         self.vdbs = []
         self.get_embeddings_for_vdb = get_embeddings_for_vdb
-        self.chars_per_word = chars_per_word
         self.as_excel = as_excel
+        print("as_excel", as_excel, " ", self.as_excel)
         if self.as_excel:
-            print(vect_columns)
+            if "vect_columns" not in kwargs:
+                raise ValueError("The argument 'vect_columns' is required when 'as_axcel' is True.")
+            vect_columns = kwargs["vect_columns"]
             if len(vect_columns) == 0:
                 vect_columns = self.vdbs[0].column_names
-            print('Columns to be vectorized: ', vect_columns)
             if vdbs_path == None:
                 # New vdbs as excels
                 for db in dbs:
@@ -99,6 +97,15 @@ class Vdbs():
                             )
                     self.vdbs.append(vdb)
         else:
+            if "add_words" not in kwargs:
+                raise ValueError("The argument 'add_words' is required when 'as_axcel' is False.")
+            if "add_words_nr_word_thr" not in kwargs:
+                raise ValueError("The argument 'add_words_nr_word_thr' is required when 'as_axcel' is False.")
+            if "chars_per_word" not in kwargs:
+                raise ValueError("The argument 'chars_per_word' is required when 'as_axcel' is False.")
+            add_words = kwargs["add_words"]
+            add_words_nr_word_thr = kwargs["add_words_nr_word_thr"]
+            self.chars_per_word = kwargs["chars_per_word"]
             if vdbs_path == None:
                 # New vdbs as raw files
                 for db in dbs:
@@ -112,7 +119,7 @@ class Vdbs():
                     vdb = db
                     vdb.load_faiss_index(
                         'embeddings', 
-                        os.path.join(vdbs_path, f'faiss_{i}.faiss')
+                        os.path.join(vdbs_path, f'{i}.faiss')
                         )
                 self.vdbs.append(vdb)
             # Calculate how many words a bunch is long
@@ -133,29 +140,39 @@ class Vdbs():
         cls,
         files,
         get_embeddings_for_vdb,
-        vect_columns,
-        chars_per_word,
-        as_excel = False,
-        vdbs_params = None,
+        as_excel,
         **kwargs,
     ):
         if as_excel:
+            if "vect_columns" not in kwargs:
+                raise ValueError("The argument 'vect_columns' is required when 'as_axcel' is True.")
+            
             excel_dbs = [pd.read_excel(f["path"]).astype(str) for f in files]
             dbs = [datasets.Dataset.from_pandas(db) for db in excel_dbs]
 
-        elif(chars_per_word > 0):
+        else:
+            if "vdbs_params" not in kwargs:
+                raise ValueError("The argument 'vdbs_params' is required when 'as_axcel' is False.")
+            if "chars_per_word" not in kwargs:
+                raise ValueError("The argument 'chars_per_word' is required when 'as_axcel' is False.")
+            if "add_words" not in kwargs:
+                raise ValueError("The argument 'add_words' is required when 'as_axcel' is False.")
+            if "add_words_nr_word_thr" not in kwargs:
+                raise ValueError("The argument 'add_words_nr_word_thr' is required when 'as_axcel' is False.")
+            
+            vdbs_params = kwargs["vdbs_params"]
+            chars_per_word = kwargs["chars_per_word"]
+
+            # read every file
             """
             original files format
             List of dicts with args:
                 -str 'name'
                 -str 'path'
             """
-
-            # read every file
             for i, file in enumerate(files):
                 files[i] = {**file, **file_processing.read_file(file)}
             print(f"Readed the files")
-            
             """
             new files format
             List of dicts with args:
@@ -229,16 +246,15 @@ class Vdbs():
                     "content": content_field,
                     "page": page_field,
                     }))
-        else:
-            raise ValueError("Missing parameters for vdbs creation")
+
         return cls(
             dbs,
             get_embeddings_for_vdb,
-            vect_columns,
-            chars_per_word,
             as_excel,
+            None,
             **kwargs
             )
+            
     
     @classmethod
     def from_dir(
@@ -256,14 +272,17 @@ class Vdbs():
                 print(f"\n\nthis is not a dir\n{dir}\n\n")
         with open(os.path.join(vdbs_path,"parameters.json"), "r") as file:
             parameters = json.load(file)
+        as_excel = parameters["as_excel"]
+        vect_columns = parameters["vect_columns"]
+        chars_per_word = parameters["chars_per_word"]
         return cls(
             dbs, 
-            get_embeddings_for_vdb, 
-            parameters["vect_columns"],
-            parameters["chars_per_word"],
-            as_excel = parameters["as_excel"],
-            vdbs_path = vdbs_path,
-            **kwargs,
+            get_embeddings_for_vdb,
+            as_excel, 
+            vdbs_path,
+            vect_columns = vect_columns,
+            chars_per_word = chars_per_word,
+            **kwargs        
             )
 
     def get_rag_samples(
@@ -296,7 +315,6 @@ class Vdbs():
                     sa['from'] = [vect_col]*len(sc)
                     samples = pd.concat([samples, sa], ignore_index=True)
                 samples = samples.sort_values(by='scores')[:3]
-                print(samples)
                 samples_per_vdb.append(
                     samples.drop(columns='scores').to_dict(orient='list')
                     )

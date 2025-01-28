@@ -15,6 +15,7 @@ tokenizer_name = os.path.join(k.models_path, k.llm_tokenizer)
 # embedding_model_name = os.path.join(constants.models_path, constants.embedding_model)
 embedding_model_name = k.embedding_model
 
+max_content_char_len = k.max_context_len*k.chars_per_token
 perm_context_word_len = k.rag_context_word_len*k.perm_context_ratio
 temp_context_word_len = k.rag_context_word_len - perm_context_word_len
 
@@ -26,7 +27,7 @@ async def on_chat_start():
     # Initialize system command, chat and context_len
     cl.user_session.set("system", k.system)
     cl.user_session.set("chat", [])
-    cl.user_session.set("context_len", len(k.system[0]["content"]))
+    cl.user_session.set("context_char_len", len(k.system[0]["content"]))
 
     # LLM model initialization
     llm_model = Llm(k.bnb_config, llm_name, tokenizer_name)
@@ -56,7 +57,7 @@ async def on_message(message: cl.Message):
 
     system = cl.user_session.get("system")
     chat = cl.user_session.get("chat")
-    context_len = cl.user_session.get("context_len")
+    context_char_len = cl.user_session.get("context_char_len")
     llm_model = cl.user_session.get("llm_model")
     embedding_model = cl.user_session.get("embedding_model")
     perm_vdbs = cl.user_session.get("perm_vdbs")
@@ -74,8 +75,9 @@ async def on_message(message: cl.Message):
         temp_vdbs = Vdbs.from_files_list(
             files, 
             embedding_model.get_embeddings_for_vdb, 
-            k.chars_per_word,
-            k.vdbs_params,
+            False,
+            chars_per_word = k.chars_per_word,
+            vdbs_params = k.vdbs_params,
             **k.extend_params,
             )
         print("Temporary vdbs created")
@@ -119,15 +121,14 @@ async def on_message(message: cl.Message):
     print("rag context created")
     
     # context len adaptation
-    context_len += (len(rag_context) + len(message.content))
-    while context_len > k.max_context_len*k.chars_per_token:
+    context_char_len += (len(rag_context) + len(message.content))
+    while context_char_len > max_content_char_len:
+        if len(chat)<1:
+            raise ValueError(f"context len is {context_char_len} characters, greater than max context len, that is {max_content_char_len} characters")
         context_len -= len(chat[0]["content"])
         context_len -= len(chat[1]["content"])
-        try:
-            del chat[0:2]
-        except:
-            print("too long question or too much samples from docs")
-    print(f"chat and context length adapted to be less or equal then {k.max_context_len}")       
+        del chat[0:2]
+    print(f"chat and context length adapted to be less or equal then {max_content_char_len}")       
 
     # Generate the answer
     answer = llm_model.llm_qa(
