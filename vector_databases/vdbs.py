@@ -190,7 +190,7 @@ class Vdbs():
             # for every parameters set, for every file
             dbs = []
             for vdb_params in vdbs_params:
-                chars_per_bunch = vdb_params["words_per_bunch"]*chars_per_word
+                chars_per_bunch = int(vdb_params["words_per_bunch"]*chars_per_word)
                 content_field = []
                 page_field = []
                 file_name_field = []
@@ -348,7 +348,7 @@ class Vdbs():
                     )
                 
                 # cut the last sample of every vdb
-                chars_in_last_bunch = words_in_last_bunch[i]*self.chars_per_word
+                chars_in_last_bunch = int(words_in_last_bunch[i]*self.chars_per_word)
                 nearest_exs["content"][-1] = nearest_exs["content"][-1][:chars_in_last_bunch]
                 print(f"The last sample has been cut to {words_in_last_bunch[i]} words")
 

@@ -140,6 +140,7 @@ async def on_message(message: cl.Message):
         )
     print("answer generated")
 
+
     # Create a temporary directory for PDFs
     with tempfile.TemporaryDirectory() as temp_dir:
         print(f"Temporary directory created: {temp_dir}")

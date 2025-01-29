@@ -40,7 +40,7 @@ device = "cuda"
 perm_vdbs_folder = r'C:\Users\Sinergia EPC\LLM_modules\vector_databases\permanent_vdbs\FAB_M004_manuali'
 
 # temporary vdbs constants
-chars_per_word = 5
+chars_per_word = 4.8
 vdbs_params = [
     {
         "words_per_bunch": 600,
