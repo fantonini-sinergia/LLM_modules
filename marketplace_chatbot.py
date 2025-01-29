@@ -1,16 +1,24 @@
 import os
-import chatbot_constants as k
-from LLM_inference.llm import Llm
+import marketplace_chatbot_constants as k
+from vector_databases.embedding import Embedding
+from vector_databases.file_processing import extract_page
+from vector_databases.vdbs import Vdbs
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-llm_name = os.path.join(k.models_path, k.llm_model)
-tokenizer_name = os.path.join(k.models_path, k.llm_tokenizer)
+# Embedding model initialization
+embedding_model_name = os.path.join(k.models_path, k.embedding_model)
+embedding_model = Embedding(embedding_model_name, k.device)
+print("model initialized")
 
-# LLM model initialization
-llm_model = Llm(k.bnb_config, llm_name, tokenizer_name)
-print("LLM initialized")
+# permanent vdbs loading and initialization
+perm_vdbs = Vdbs.from_dir(
+    k.perm_vdbs_folder,
+    embedding_model.get_embeddings_for_vdb,
+    **k.extend_params,
+    )
+print("permanent vdbs loaded")
 
 # Endpoint per inferenza
 @app.route('/api/infer', methods=['POST'])
@@ -18,7 +26,6 @@ def infer():
     try:
         # Recupera i dati dal corpo della richiesta
         data = request.get_json()
-        print(data)
         prompt = data.get('prompt')
 
         if not prompt:

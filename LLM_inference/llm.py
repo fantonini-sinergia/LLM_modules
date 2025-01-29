@@ -1,8 +1,14 @@
 from transformers import AutoModelForCausalLM, BitsAndBytesConfig, AutoTokenizer
 
 class Llm:
-    def __init__(self, bnb_config, llm, tokenizer):
-        self.bnb_config = BitsAndBytesConfig(**bnb_config)
+    def __init__(
+            self,
+            llm, 
+            tokenizer,
+            bnb_config=None, 
+            ):
+        if bnb_config is not None:
+            bnb_config = BitsAndBytesConfig(**bnb_config)
         self.model = AutoModelForCausalLM.from_pretrained(
             llm,
             quantization_config=bnb_config,

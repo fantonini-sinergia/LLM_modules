@@ -30,7 +30,7 @@ async def on_chat_start():
     cl.user_session.set("context_char_len", len(k.system[0]["content"]))
 
     # LLM model initialization
-    llm_model = Llm(k.bnb_config, llm_name, tokenizer_name)
+    llm_model = Llm(llm_name, tokenizer_name, bnb_config = k.bnb_config)
     print("LLM initialized")
     cl.user_session.set("llm_model", llm_model)
 
