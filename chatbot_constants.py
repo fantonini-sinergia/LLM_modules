@@ -18,26 +18,24 @@ max_context_len = 2800
 perm_context_ratio = 0.2
 
 # llm constants
-models_path = r'C:\Users\Sinergia EPC\LLMs\models_and_datasets'
-llm_model = "meta-llama\\Meta-Llama-3.1-8B-Instruct"
-llm_tokenizer = "meta-llama\\Meta-Llama-3.1-8B-Instruct"
+models_path = r'C:\Users\FilippoAntonini\OneDrive - Sinergia\LLMs-SIN031\models_and_datasets'
+llm_model = "Qwen\\Qwen2.5-0.5B-Instruct"
+llm_tokenizer = "Qwen\\Qwen2.5-0.5B-Instruct"
 bnb_config = {
     "load_in_4bit": True,
     "bnb_4bit_compute_dtype": "float16",
     "bnb_4bit_quant_type": "nf4",
     "bnb_4bit_use_double_quant": False
 }
+embedding_model_name = "sentence-transformers\\all-MiniLM-L6-v2"
+device = "cuda"
 max_new_tokens = 2048
 temperature = 0.6
 top_p = 0.9
 
-# embedding model constants
-embedding_model = 'sentence-transformers/all-MiniLM-L6-v2'
-embedding_model_name = "sentence-transformers\\all-MiniLM-L6-v2" # still not used
-device = "cuda"
 
 # permanent vdbs constants
-perm_vdbs_folder = r'C:\Users\Sinergia EPC\LLM_modules\vector_databases\permanent_vdbs\FAB_M004_manuali'
+perm_vdbs_folder = r'C:\Users\FilippoAntonini\OneDrive - Sinergia\LLM_modules\vector_databases\permanent_vdbs\FAB_M004_manuali'
 
 # temporary vdbs constants
 chars_per_word = 4.8
