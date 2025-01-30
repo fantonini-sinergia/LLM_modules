@@ -24,7 +24,7 @@ class Llm:
             train, 
             max_new_tokens, 
             temperature, 
-            top_p, 
+            top_p,
             ):
         print("\n\n", "-"*20)
         print("generating the answer...")
@@ -49,7 +49,7 @@ class Llm:
 
         print("answer generated")
         print("-"*20, "\n\n")
-        return result, len(input_ids)
+        return result
     
 
     # def llm_rag_qa(
