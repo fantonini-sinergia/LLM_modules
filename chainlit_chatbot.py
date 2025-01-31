@@ -2,7 +2,7 @@ import os
 import chainlit as cl
 import tempfile
 import chatbot_constants as k
-from LLM_inference.llm import Llm
+from app.llm import Llm
 from vector_databases.embedding import Embedding
 from vector_databases.file_processing import extract_page
 from vector_databases.vdbs import Vdbs

@@ -13,9 +13,8 @@ system = [
     }
 ]
 chars_per_token = 4
-rag_context_word_len = 1800
-max_context_len = 2800
-perm_context_ratio = 0.2
+rag_context_ratio = 0.2
+perm_rag_context_ratio = 0.2
 
 # llm constants
 models_path = r'C:\Users\FilippoAntonini\OneDrive - Sinergia\LLMs-SIN031\models_and_datasets'

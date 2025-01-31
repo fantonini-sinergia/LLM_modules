@@ -1,14 +1,14 @@
 import os
 import tempfile
-import chatbot_constants as k
-from LLM_inference.llm import Llm
+import app.chatbot_constants as k
+from app.llm import Llm
 from vector_databases.embedding import Embedding
 from vector_databases.file_processing import extract_page
 from vector_databases.vdbs import Vdbs
-from flask import Flask, request, jsonify
+from flask import Blueprint, request, jsonify
 import requests
 
-app = Flask(__name__)
+api_chatbot_bp = Blueprint('api_chatbot', __name__)
 
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
@@ -17,14 +17,13 @@ llm_name = os.path.join(k.models_path, k.llm_model)
 tokenizer_name = os.path.join(k.models_path, k.llm_tokenizer)
 embedding_model_name = os.path.join(k.models_path, k.embedding_model)
 
-context_char_len = len(k.system[0]["content"])
-max_content_char_len = k.max_context_len*k.chars_per_token
-perm_context_word_len = k.rag_context_word_len*k.perm_context_ratio
-temp_context_word_len = k.rag_context_word_len - perm_context_word_len
-
-
 # LLM model initialization
-llm_model = Llm(llm_name, tokenizer_name, bnb_config = k.bnb_config)
+llm_model = Llm(
+    llm_name, 
+    tokenizer_name, 
+    k.system,
+    bnb_config = k.bnb_config,
+    )
 print("LLM initialized")
 
 # Embedding model initialization
@@ -40,20 +39,27 @@ perm_vdbs = Vdbs.from_dir(
 print("permanent vdbs loaded")
 
 # chat initialization
-chat = []
+user_chats = {}
 system = k.system
 
 # Endpoint per inferenza
-@app.route('/api/infer', methods=['POST'])
+@api_chatbot_bp.route('/infer', methods=['POST'])
 def infer():
-    global context_char_len
-    global chat
     try:
         # Recupera i dati dal corpo della richiesta
-        prompt = request.form.get('prompt')
+        data = request.form.to_dict()
+        prompt = data.get('prompt')
+        user_id = data.get('user_id')
 
-        if not prompt:
-            return jsonify({'error': 'Il campo "prompt" è richiesto.'}), 400
+        if not prompt or not user_id:
+            return jsonify({'error': 'I campi "prompt" e "user_id" sono richiesti.'}), 400
+
+        # Initialize chat history for the user if not already present
+        if user_id not in user_chats:
+            user_chats[user_id] = {
+                'chat': [],
+                'tokens_per_msg': [],
+            }
 
         # Get attachments
         attachments = request.files.getlist("files")
@@ -111,23 +117,11 @@ def infer():
             "\n\n\nDomanda: "
         print("rag context created")
 
-        # context len adaptation
-        context_char_len += (len(rag_context) + len(prompt))
-        while context_char_len > max_content_char_len:
-            if len(chat)<1:
-                raise ValueError(f"context len is {context_char_len} characters, greater than max context len, that is {max_content_char_len} characters")
-            context_char_len -= len(chat[0]["content"])
-            context_char_len -= len(chat[1]["content"])
-            del chat[0:2]
-        print(f"chat and context length adapted to be less or equal then {max_content_char_len}")       
 
         # Generate the answer
-        answer = llm_model.llm_qa(
-            system + chat + [{"role": "user", "content": rag_context + prompt}],  
-            train = False,
-            max_new_tokens = k.max_new_tokens,
-            temperature = k.temperature,
-            top_p = k.top_p,
+        answer, user_chats[user_id] = llm_model.llm_qa(
+            user_chats[user_id],
+            rag_context + prompt,  
             )
         print("answer generated")
 
@@ -156,16 +150,6 @@ def infer():
                 text_sources.append(text_source)
             print(f"rag sources formatted")
 
-
-
-        # Update the chat and the context len
-        chat = chat + \
-        [{"role": "user", "content": prompt}] + \
-        [{"role": "assistant", "content": answer}]
-        context_char_len = context_char_len + len(answer)
-        print("chat and context len updated with new question and answer")
-
-
         response = {
             'prompt': prompt,
             'response': answer,
@@ -177,6 +161,3 @@ def infer():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
-if __name__ == '__main__':
-    app.run(debug=True)
