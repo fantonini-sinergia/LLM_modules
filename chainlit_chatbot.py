@@ -1,7 +1,7 @@
 import os
 import chainlit as cl
 import tempfile
-import chatbot_constants as k
+import app.chatbot_constants as k
 from app.llm import Llm
 from vector_databases.embedding import Embedding
 from vector_databases.file_processing import extract_page
