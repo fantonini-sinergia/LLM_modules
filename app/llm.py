@@ -53,7 +53,7 @@ class Llm:
         print(f"chat adapted") 
         
         # tokenize the chat
-        input_ids = self.tokenize(self.system + chat)
+        input_ids = self.tokenize(self.system + chat["chat"][-msgs_counter:])
 
         # If max_new_tokens is None, set it to the remaining capacity of the model
         if max_new_tokens is None:

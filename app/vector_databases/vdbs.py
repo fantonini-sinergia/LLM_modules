@@ -311,7 +311,7 @@ class Vdbs():
                     )
 
         else:
-
+            samples_per_vdb = []
             for i, vdb in enumerate(self.vdbs):
                 
                 # retrieve the samples for every vdb
