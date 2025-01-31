@@ -19,7 +19,11 @@ class Llm:
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
         self.system = system
-        self.system_len = self.tokenizer(self.system, return_tensors="pt").shape[-1]
+        self.system_len = self.tokenizer.apply_chat_template(
+            system,
+            add_generation_prompt = True,
+            return_tensors="pt"
+        ).to(self.model.device).shape[-1]
         self.max_input_length = self.tokenizer.model_max_length
 
 
@@ -27,7 +31,6 @@ class Llm:
             self,
             chat,
             question,
-            train=False, 
             max_new_tokens=None,  # Allow max_new_tokens to be None
             temperature=0.7, 
             top_p=0.9,
@@ -39,7 +42,7 @@ class Llm:
         question = [
             {"role": "user", "content": question}
         ]
-        question_len = self.tokenize(train, question).shape[-1]
+        question_len = self.tokenize(question).shape[-1]
         chat["tokens_per_msg"].append(question_len)
         chat["chat"] += question
         msgs_counter = len(chat["tokens_per_msg"])
@@ -50,7 +53,7 @@ class Llm:
         print(f"chat adapted") 
         
         # tokenize the chat
-        input_ids = self.tokenize(train, self.system + chat)
+        input_ids = self.tokenize(self.system + chat)
 
         # If max_new_tokens is None, set it to the remaining capacity of the model
         if max_new_tokens is None:
@@ -84,10 +87,10 @@ class Llm:
     def get_max_input_length(self):
         return self.tokenizer.model_max_length
     
-    def tokenize(self, train, chat):
+    def tokenize(self, chat):
         input_ids = self.tokenizer.apply_chat_template(
             chat,
-            add_generation_prompt= not train,
+            add_generation_prompt= True,
             return_tensors="pt"
         ).to(self.model.device)
         return input_ids

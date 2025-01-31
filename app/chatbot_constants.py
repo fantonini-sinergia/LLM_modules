@@ -26,7 +26,7 @@ bnb_config = {
     "bnb_4bit_quant_type": "nf4",
     "bnb_4bit_use_double_quant": False
 }
-embedding_model_name = "sentence-transformers\\all-MiniLM-L6-v2"
+embedding_model = "sentence-transformers\\all-MiniLM-L6-v2"
 device = "cuda"
 max_new_tokens = 2048
 temperature = 0.6
@@ -34,23 +34,23 @@ top_p = 0.9
 
 
 # permanent vdbs constants
-perm_vdbs_folder = r'C:\Users\FilippoAntonini\OneDrive - Sinergia\LLM_modules\vector_databases\permanent_vdbs\FAB_M004_manuali'
+perm_vdbs_folder = r'C:\Users\FilippoAntonini\OneDrive - Sinergia\LLM_modules\permanent_vdbs\FAB_M004_manuali'
 
 # temporary vdbs constants
 chars_per_word = 4.8
 vdbs_params = [
     {
-        "words_per_bunch": 600,
+        "chars_per_bunch": 3000,
         "resplits": 2
     },
     {
-        "words_per_bunch": 100,
+        "chars_per_bunch": 500,
         "resplits": 2
     }
 ]
 
 # extension of the sample
 extend_params = {
-    "add_words": 300,
-    "add_words_nr_word_thr": 150
+    "add_chars": 2000,
+    "add_chars_nr_char_thr": 1500
 }

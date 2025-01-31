@@ -22,10 +22,9 @@ Class vdbs is a list of vector databases for retrieval augmented generation
 
 import os
 import json
-import math
 import pandas as pd
 import datasets
-from vector_databases import file_processing
+from app.vector_databases import file_processing
 
 def extend_bunches(
         vdb, 
@@ -97,15 +96,12 @@ class Vdbs():
                             )
                     self.vdbs.append(vdb)
         else:
-            if "add_words" not in kwargs:
-                raise ValueError("The argument 'add_words' is required when 'as_axcel' is False.")
-            if "add_words_nr_word_thr" not in kwargs:
-                raise ValueError("The argument 'add_words_nr_word_thr' is required when 'as_axcel' is False.")
-            if "chars_per_word" not in kwargs:
-                raise ValueError("The argument 'chars_per_word' is required when 'as_axcel' is False.")
-            add_words = kwargs["add_words"]
-            add_words_nr_word_thr = kwargs["add_words_nr_word_thr"]
-            self.chars_per_word = kwargs["chars_per_word"]
+            if "add_chars" not in kwargs:
+                raise ValueError("The argument 'add_chars' is required when 'as_axcel' is False.")
+            if "add_chars_nr_char_thr" not in kwargs:
+                raise ValueError("The argument 'add_chars_nr_char_thr' is required when 'as_axcel' is False.")
+            add_chars = kwargs["add_chars"]
+            add_chars_nr_char_thr = kwargs["add_chars_nr_char_thr"]
             if vdbs_path == None:
                 # New vdbs as raw files
                 for db in dbs:
@@ -122,14 +118,14 @@ class Vdbs():
                         os.path.join(vdbs_path, f'{i}.faiss')
                         )
                 self.vdbs.append(vdb)
-            # Calculate how many words a bunch is long
-            self.words_per_bunch = [len(vdb["content"][0])/self.chars_per_word for vdb in self.vdbs]
+            # Calculate how many chars a bunch is long
+            self.chars_per_bunch = [len(vdb["content"][0]) for vdb in self.vdbs]
             # Calculate how many bunches to add to each one retrieved
             self.add_bunches = []
-            for i, _ in enumerate(self.words_per_bunch):
-                if self.words_per_bunch[i] < add_words_nr_word_thr:
-                    add_bunches = int(add_words/self.words_per_bunch[i])
-                    self.words_per_bunch[i] += add_bunches*self.words_per_bunch[i]
+            for i, _ in enumerate(self.chars_per_bunch):
+                if self.chars_per_bunch[i] < add_chars_nr_char_thr:
+                    add_bunches = int(add_chars/self.chars_per_bunch[i])
+                    self.chars_per_bunch[i] += add_bunches*self.chars_per_bunch[i]
                     self.add_bunches.append(add_bunches)
                 else:
                     self.add_bunches.append(False)
@@ -153,15 +149,12 @@ class Vdbs():
         else:
             if "vdbs_params" not in kwargs:
                 raise ValueError("The argument 'vdbs_params' is required when 'as_axcel' is False.")
-            if "chars_per_word" not in kwargs:
-                raise ValueError("The argument 'chars_per_word' is required when 'as_axcel' is False.")
-            if "add_words" not in kwargs:
-                raise ValueError("The argument 'add_words' is required when 'as_axcel' is False.")
-            if "add_words_nr_word_thr" not in kwargs:
-                raise ValueError("The argument 'add_words_nr_word_thr' is required when 'as_axcel' is False.")
+            if "add_chars" not in kwargs:
+                raise ValueError("The argument 'add_chars' is required when 'as_axcel' is False.")
+            if "add_chars_nr_char_thr" not in kwargs:
+                raise ValueError("The argument 'add_chars_nr_char_thr' is required when 'as_axcel' is False.")
             
             vdbs_params = kwargs["vdbs_params"]
-            chars_per_word = kwargs["chars_per_word"]
 
             # read every file
             """
@@ -190,7 +183,7 @@ class Vdbs():
             # for every parameters set, for every file
             dbs = []
             for vdb_params in vdbs_params:
-                chars_per_bunch = int(vdb_params["words_per_bunch"]*chars_per_word)
+                chars_per_bunch = int(vdb_params["chars_per_bunch"])
                 content_field = []
                 page_field = []
                 file_name_field = []
@@ -274,14 +267,12 @@ class Vdbs():
             parameters = json.load(file)
         as_excel = parameters["as_excel"]
         vect_columns = parameters["vect_columns"]
-        chars_per_word = parameters["chars_per_word"]
         return cls(
             dbs, 
             get_embeddings_for_vdb,
             as_excel, 
             vdbs_path,
             vect_columns = vect_columns,
-            chars_per_word = chars_per_word,
             **kwargs        
             )
 
@@ -289,7 +280,7 @@ class Vdbs():
             self,
             text,
             get_embeddings_for_question, 
-            context_word_len = None,
+            nr_bunches = 1,
             ):
 
         """
@@ -321,24 +312,15 @@ class Vdbs():
 
         else:
 
-            # calculate the number of bunches to retrieve from each vdb
-            nr_retrieved = context_word_len/sum(self.words_per_bunch)
-
-            # calculate how many words to take for the last sample
-            ratio_last_bunch = nr_retrieved - int(nr_retrieved)
-            words_in_last_bunch = [int(w*ratio_last_bunch) for w in self.words_per_bunch]
-
-            samples_per_vdb = []
             for i, vdb in enumerate(self.vdbs):
                 
                 # retrieve the samples for every vdb
-                int_nr_retrieved = math.ceil(nr_retrieved)
                 _, nearest_exs = vdb.get_nearest_examples(
                     "embeddings", 
                     embededded_question, 
-                    k = int_nr_retrieved
+                    k = nr_bunches,
                     )
-                print(f'Retrieved {int_nr_retrieved} samples for vdb nr {i + 1}')
+                print(f'Retrieved {nr_bunches} samples for vdb nr {i + 1}')
                 
                 # extend the samples of every vdb
                 nearest_exs = extend_bunches(
@@ -346,11 +328,6 @@ class Vdbs():
                     nearest_exs, 
                     self.add_bunches[i]
                     )
-                
-                # cut the last sample of every vdb
-                chars_in_last_bunch = int(words_in_last_bunch[i]*self.chars_per_word)
-                nearest_exs["content"][-1] = nearest_exs["content"][-1][:chars_in_last_bunch]
-                print(f"The last sample has been cut to {words_in_last_bunch[i]} words")
 
                 samples_per_vdb.append(nearest_exs)
 

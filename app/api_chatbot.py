@@ -2,11 +2,10 @@ import os
 import tempfile
 import app.chatbot_constants as k
 from app.llm import Llm
-from vector_databases.embedding import Embedding
-from vector_databases.file_processing import extract_page
-from vector_databases.vdbs import Vdbs
+from app.vector_databases.embedding import Embedding
+from app.vector_databases.file_processing import extract_page
+from app.vector_databases.vdbs import Vdbs
 from flask import Blueprint, request, jsonify
-import requests
 
 api_chatbot_bp = Blueprint('api_chatbot', __name__)
 
@@ -74,7 +73,6 @@ def infer():
                 files, 
                 embedding_model.get_embeddings_for_vdb, 
                 False,
-                chars_per_word = k.chars_per_word,
                 vdbs_params = k.vdbs_params,
                 **k.extend_params,
                 )
@@ -84,7 +82,7 @@ def infer():
             samples_from_temp = temp_vdbs.get_rag_samples(
                 prompt, 
                 embedding_model.get_embeddings_for_question, 
-                temp_context_word_len,
+                nr_bunches = 1,
                 )
             print("retrieved from temporary vdbs")
             
@@ -92,7 +90,7 @@ def infer():
         samples_from_perm = perm_vdbs.get_rag_samples(
             prompt, 
             embedding_model.get_embeddings_for_question, 
-            perm_context_word_len,
+            nr_bunches = 1,
             )
         print("retrieved from permanent vdbs")
 
