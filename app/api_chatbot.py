@@ -29,14 +29,6 @@ print("LLM initialized")
 embedding_model = Embedding(embedding_model_name, k.device)
 print("Embedding model initialized")
 
-# permanent vdbs loading and initialization
-perm_vdbs = Vdbs.from_dir(
-    k.perm_vdbs_folder,
-    embedding_model.get_embeddings_for_vdb,
-    **k.extend_params,
-    )
-print("permanent vdbs loaded")
-
 # chat initialization
 user_chats = {}
 system = k.system
@@ -48,10 +40,16 @@ def infer():
         # Recupera i dati dal corpo della richiesta
         data = request.form.to_dict()
         prompt = data.get('prompt')
+        attachments = request.files.getlist("files")
+        rag_dataset = data.get('rag_dataset')
+        search_dataset = data.get('search_dataset_url')
+        search_dataset_vect_columns = data.get('search_dataset_url_vect_columns')
         user_id = data.get('user_id')
 
         if not prompt or not user_id:
             return jsonify({'error': 'I campi "prompt" e "user_id" sono richiesti.'}), 400
+        if search_dataset and not search_dataset_vect_columns:
+            return jsonify({'error': 'Il campo "api_dataset_vect_columns" è richiesto se "api_dataset" è presente.'}), 400
 
         # Initialize chat history for the user if not already present
         if user_id not in user_chats:
@@ -60,8 +58,16 @@ def infer():
                 'tokens_per_msg': [],
             }
 
-        # Get attachments
-        attachments = request.files.getlist("files")
+        # Get permanent vdbs from the provided URL
+        if rag_dataset_url:
+            perm_vdbs = Vdbs.from_dir(
+                rag_dataset_url,
+                embedding_model.get_embeddings_for_vdb,
+                **k.extend_params,
+                )
+            print("permanent vdbs loaded")
+
+        # Get temporary vdbs from the attachments
         if attachments:
             files = []
             for file in attachments:
@@ -69,30 +75,51 @@ def infer():
                 file.save(temp_file_path)
                 files.append({"name": file.filename, "path": temp_file_path})
             print(f'{len(files)} files attached')
-            temp_vdbs = Vdbs.from_files_list(
+            files_temp_vdbs = Vdbs.from_files_list(
                 files, 
                 embedding_model.get_embeddings_for_vdb, 
                 False,
                 vdbs_params = k.vdbs_params,
                 **k.extend_params,
                 )
-            print("Temporary vdbs created")
+            print("Temporary vdbs created from attachments")
+            
+        # Get temporary vdbs from the API dataset
+        if search_dataset:
+            json_temp_vdbs = Vdbs.from_api(
+                search_dataset, 
+                embedding_model.get_embeddings_for_vdb, 
+                True,
+                vect_columns = search_dataset_vect_columns,
+            )
+            print("Temporary vdbs created from api")
+        
+        # Get the samples from the permanent vdbs
+        if perm_vdbs:
+            samples_from_perm = perm_vdbs.get_rag_samples(
+                prompt, 
+                embedding_model.get_embeddings_for_question, 
+                nr_bunches = 1,
+                )
+            print("retrieved from permanent vdbs")
 
-            # Get the samples from the temporary vdbs
-            samples_from_temp = temp_vdbs.get_rag_samples(
+        # Get the samples from the files temporary vdbs
+        if files_temp_vdbs:
+            samples_from_temp = files_temp_vdbs.get_rag_samples(
                 prompt, 
                 embedding_model.get_embeddings_for_question, 
                 nr_bunches = 1,
                 )
             print("retrieved from temporary vdbs")
-            
-        # Get the samples from the permanent vdbs
-        samples_from_perm = perm_vdbs.get_rag_samples(
-            prompt, 
-            embedding_model.get_embeddings_for_question, 
-            nr_bunches = 1,
-            )
-        print("retrieved from permanent vdbs")
+
+        # Get the samples from the API temporary vdbs
+        if json_temp_vdbs:
+            samples_from_temp = json_temp_vdbs.get_rag_samples(
+                prompt, 
+                embedding_model.get_embeddings_for_question, 
+                nr_bunches = 1,
+                )
+            print("retrieved from temporary vdbs")
 
         keys = samples_from_perm[0].keys()
         samples = {key: [] for key in keys}

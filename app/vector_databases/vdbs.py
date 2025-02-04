@@ -22,6 +22,7 @@ Class vdbs is a list of vector databases for retrieval augmented generation
 
 import os
 import json
+import requests
 import pandas as pd
 import datasets
 from app.vector_databases import file_processing
@@ -58,15 +59,15 @@ class Vdbs():
             self, 
             dbs,
             get_embeddings_for_vdb,
-            as_excel,
+            search,
             vdbs_path,
             **kwargs,
             ):
         self.vdbs = []
         self.get_embeddings_for_vdb = get_embeddings_for_vdb
-        self.as_excel = as_excel
-        print("as_excel", as_excel, " ", self.as_excel)
-        if self.as_excel:
+        self.search = search
+        print("search", search, " ", self.search)
+        if self.search:
             if "vect_columns" not in kwargs:
                 raise ValueError("The argument 'vect_columns' is required when 'as_axcel' is True.")
             vect_columns = kwargs["vect_columns"]
@@ -136,10 +137,10 @@ class Vdbs():
         cls,
         files,
         get_embeddings_for_vdb,
-        as_excel,
+        search,
         **kwargs,
     ):
-        if as_excel:
+        if search:
             if "vect_columns" not in kwargs:
                 raise ValueError("The argument 'vect_columns' is required when 'as_axcel' is True.")
             
@@ -243,7 +244,7 @@ class Vdbs():
         return cls(
             dbs,
             get_embeddings_for_vdb,
-            as_excel,
+            search,
             None,
             **kwargs
             )
@@ -265,15 +266,118 @@ class Vdbs():
                 print(f"\n\nthis is not a dir\n{dir}\n\n")
         with open(os.path.join(vdbs_path,"parameters.json"), "r") as file:
             parameters = json.load(file)
-        as_excel = parameters["as_excel"]
+        search = parameters["search"]
         vect_columns = parameters["vect_columns"]
         return cls(
             dbs, 
             get_embeddings_for_vdb,
-            as_excel, 
+            search, 
             vdbs_path,
             vect_columns = vect_columns,
             **kwargs        
+            )
+    
+    @classmethod
+    def from_api(
+        cls,
+        api_url,
+        get_embeddings_for_vdb,
+        search,
+        **kwargs,
+        ):
+        response = requests.get(api_url)
+        if response.status_code != 200:
+            raise ValueError(f"Failed to fetch data from API. Status code: {response.status_code}")
+        
+        data = response.json()
+        
+        if search:
+            if "vect_columns" not in kwargs:
+                raise ValueError("The argument 'vect_columns' is required when 'as_axcel' is True.")
+            
+            excel_dbs = [pd.DataFrame(data).astype(str)]
+            dbs = [datasets.Dataset.from_pandas(db) for db in excel_dbs]
+
+        else:
+            if "vdbs_params" not in kwargs:
+                raise ValueError("The argument 'vdbs_params' is required when 'as_axcel' is False.")
+            if "add_chars" not in kwargs:
+                raise ValueError("The argument 'add_chars' is required when 'as_axcel' is False.")
+            if "add_chars_nr_char_thr" not in kwargs:
+                raise ValueError("The argument 'add_chars_nr_char_thr' is required when 'as_axcel' is False.")
+            
+            vdbs_params = kwargs["vdbs_params"]
+
+            # Process the data
+            files = [{"name": f"api_data_{i}", "path": api_url, "text": item["text"], "file_extension": "json", "pages_start_char": [0]} for i, item in enumerate(data)]
+            print(f"Processed the API data")
+
+            # for every parameters set, for every file
+            dbs = []
+            for vdb_params in vdbs_params:
+                chars_per_bunch = int(vdb_params["chars_per_bunch"])
+                content_field = []
+                page_field = []
+                file_name_field = []
+                file_path_field = []
+                file_extension_field = []
+                bunch_count_field = []
+                split_count_field = []
+                all_bunches_counter = 0
+                all_splits_counter = 0
+                for file in files:
+
+                    # generate the bunches
+                    bunches = file_processing.split_in_bunches(
+                        file = file, 
+                        chars_per_bunch = chars_per_bunch,
+                        resplits = vdb_params["resplits"],
+                        all_bunches_counter = all_bunches_counter,
+                        all_splits_counter = all_splits_counter
+                    )
+                    num_bunches = len(bunches["bunches_content"])
+                    print(f'generated {num_bunches} text bunches for parameters set {vdb_params}')
+
+                    # load bunches content
+                    content_field += bunches["bunches_content"]
+
+                    # load bunches counts
+                    bunch_count_field += bunches["bunches_counter"]
+                    all_bunches_counter = bunch_count_field[-1] + 1
+
+                    # load splits counts
+                    split_count_field += bunches["splits_counter"]
+                    all_splits_counter = split_count_field[-1] + 1
+
+                    # load bunches start page
+                    page_field += bunches["bunches_start_page"]
+
+                    # load bunches file
+                    file_name_field += [file["name"]]*num_bunches
+
+                    # load bunches file path
+                    file_path_field += [file["path"]]*num_bunches
+
+                    # load bunches file extension
+                    file_extension_field += [file["file_extension"]]*num_bunches
+
+                # append to the db
+                dbs.append(datasets.Dataset.from_dict({
+                    "bunch_count": bunch_count_field,
+                    "split_count": split_count_field,
+                    "file_name": file_name_field,
+                    "file_path": file_path_field,
+                    "file_extension": file_extension_field,
+                    "content": content_field,
+                    "page": page_field,
+                    }))
+
+        return cls(
+            dbs,
+            get_embeddings_for_vdb,
+            search,
+            None,
+            **kwargs
             )
 
     def get_rag_samples(
@@ -284,14 +388,19 @@ class Vdbs():
             ):
 
         """
-        args:
-        - 
         """
         # embed the question
         embededded_question = get_embeddings_for_question(text)
         print("Question embedded")
 
-        if self.as_excel:
+        if self.search:
+            # retrieve the samples, search case
+            """
+            In case of search, there is a single vdb only (a list is used to mantain the same
+            structure of search = False). However, we have more than one retrieval, one per vect_column.
+            There is no difference in the length of the samples when retrieving with a different vect_column,
+            so at the end of the loop, the samples are concatenated and sorted by the scores.
+            """
             samples_per_vdb = []
             samples = pd.DataFrame()
             for i, vdb in enumerate(self.vdbs):
@@ -311,6 +420,12 @@ class Vdbs():
                     )
 
         else:
+            # retrieve the samples, search=False case
+            """
+            In case of search=False, we have a list of vdbs. A retrieval for each vdb is made, and,
+            each time, the n samples with high scores are taken. The number of samples from each vdb is
+            decided by the parameter nr_bunches. The samples are then extended.
+            """
             samples_per_vdb = []
             for i, vdb in enumerate(self.vdbs):
                 
@@ -332,3 +447,16 @@ class Vdbs():
                 samples_per_vdb.append(nearest_exs)
 
         return samples_per_vdb
+    
+    def stack(self, other):
+        if (self.get_embeddings_for_vdb == other.get_embeddings_for_vdb
+            and self.add_bunches_nr_char_thr == other.add_bunches_nr_char_thr
+            and not self.search 
+            and not other.search):
+            self.vdbs.extend(other.vdbs)
+            self.chars_per_bunch.extend(other.chars_per_bunch)
+            self.add_bunches.extend(other.add_bunches)
+            print("VDBs merged successfully.")
+        else:
+            raise ValueError("The VDBs cannot be merged. Ensure that 'get_embeddings_for_vdb'\
+                             is the same for both objects and 'search' is False for both objects.")

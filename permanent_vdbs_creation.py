@@ -2,8 +2,8 @@ import os
 from pathlib import Path
 import json
 import permanent_vdbs_creation_constants as k
-from embedding import Embedding
-from vdbs import Vdbs
+from app.vector_databases.embedding import Embedding
+from app.vector_databases.vdbs import Vdbs
 
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
