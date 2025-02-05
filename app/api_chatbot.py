@@ -41,7 +41,7 @@ def infer():
         data = request.form.to_dict()
         prompt = data.get('prompt')
         attachments = request.files.getlist("files")
-        rag_dataset = data.get('rag_dataset')
+        rag_datasets = data.get('rag_datasets')
         search_dataset = data.get('search_dataset_url')
         search_dataset_vect_columns = data.get('search_dataset_url_vect_columns')
         user_id = data.get('user_id')
@@ -58,14 +58,23 @@ def infer():
                 'tokens_per_msg': [],
             }
 
-        # Get permanent vdbs from the provided URL
-        if rag_dataset_url:
-            perm_vdbs = Vdbs.from_dir(
-                rag_dataset_url,
-                embedding_model.get_embeddings_for_vdb,
-                **k.extend_params,
-                )
-            print("permanent vdbs loaded")
+        # Get the RAG dataset
+        for rag_dataset in rag_datasets:
+            if type(rag_dataset) == str:
+                if rag_dataset == "files":
+                    if attachments:
+                        pass
+                    else:
+                        return jsonify({'error': 'You set "files" as rag dataset but missed the attachments'}), 400
+                # Get permanent vdbs from the provided URL
+                rag_dataset_url = rag_datasets
+                perm_vdbs = Vdbs.from_dir(
+                    rag_dataset_url,
+                    embedding_model.get_embeddings_for_vdb,
+                    **k.extend_params,
+                    )
+                print("permanent vdbs loaded")
+
 
         # Get temporary vdbs from the attachments
         if attachments:
