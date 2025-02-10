@@ -87,7 +87,7 @@ class Vdbs():
                     print('New columns: ', vdb.list_indexes())
                     self.vdbs.append(vdb)
             else:
-                # Loaded vdbs as excels
+                # Loaded vdbs for search
                 for i, db in enumerate(dbs):
                     vdb = db
                     for col in vect_columns:
@@ -98,7 +98,7 @@ class Vdbs():
                     self.vdbs.append(vdb)
         else:
             if "add_chars" not in kwargs:
-                raise ValueError("The argument 'add_chars' is required when 'as_axcel' is False.")
+                raise ValueError("The argument 'add_chars' is required when 'search' is False.")
             if "add_chars_nr_char_thr" not in kwargs:
                 raise ValueError("The argument 'add_chars_nr_char_thr' is required when 'as_axcel' is False.")
             add_chars = kwargs["add_chars"]
@@ -285,7 +285,7 @@ class Vdbs():
         search,
         **kwargs,
         ):
-        response = requests.get(api_url)
+        response = requests.get(api_url, params={"crafterSite": "ideale"})
         if response.status_code != 200:
             raise ValueError(f"Failed to fetch data from API. Status code: {response.status_code}")
         
@@ -293,18 +293,43 @@ class Vdbs():
         
         if search:
             if "vect_columns" not in kwargs:
-                raise ValueError("The argument 'vect_columns' is required when 'as_axcel' is True.")
+                raise ValueError("The argument 'vect_columns' is required when 'search' is True.")
             
-            excel_dbs = [pd.DataFrame(data).astype(str)]
+            # excel_dbs = [pd.DataFrame(data).astype(str)]
+
+            """
+            PROVVISORIO PER CARLONI
+            """
+            excel_dbs = [pd.DataFrame([{
+                **{'nome': item['name_s']},
+                **{'contenuto': item['contenuto_t']},
+                **{'obiettivo': item['obiettivo_t']},
+                **{'partner': item['partner_o']['item'][0]['component']['name_s']},
+                **{'costo': item['costo_s']},
+                # **{'extra_cost': item['extra_costo_t']},
+                **{'durata': item['durata_s']},
+                **{'modalità': item['modalita_t']},
+                **{'target': item['rivolto_t']},
+                **{'url': item['rootId']},
+                **{'max partecipanti': item['maxpartecipanti_s']},
+                **{'macrocategoria': item['subcategory_o']['item'][0]['component']['category_o']['item'][0]['component']['macro_category_o']['item'][0]['component']['name_s']},
+                **{'categoria': item['subcategory_o']['item'][0]['component']['category_o']['item'][0]['component']['name_s']},
+                **{'sottocategoria': item['subcategory_o']['item'][0]['component']['name_s']},
+                **{'tags': ', '.join([tag['value_smv'] for tag in item['subcategory_o']['item'][0]['component']['tags_o']['item']])},
+                } for item in data['items']])]
+
             dbs = [datasets.Dataset.from_pandas(db) for db in excel_dbs]
 
         else:
+            """
+            lascia questa parte per dopo Carloni
+            """
             if "vdbs_params" not in kwargs:
-                raise ValueError("The argument 'vdbs_params' is required when 'as_axcel' is False.")
+                raise ValueError("The argument 'vdbs_params' is required when 'search' is False.")
             if "add_chars" not in kwargs:
-                raise ValueError("The argument 'add_chars' is required when 'as_axcel' is False.")
+                raise ValueError("The argument 'add_chars' is required when 'search' is False.")
             if "add_chars_nr_char_thr" not in kwargs:
-                raise ValueError("The argument 'add_chars_nr_char_thr' is required when 'as_axcel' is False.")
+                raise ValueError("The argument 'add_chars_nr_char_thr' is required when 'search' is False.")
             
             vdbs_params = kwargs["vdbs_params"]
 
@@ -416,7 +441,8 @@ class Vdbs():
                     samples = pd.concat([samples, sa], ignore_index=True)
                 samples = samples.sort_values(by='scores')[:3]
                 samples_per_vdb.append(
-                    samples.drop(columns='scores').to_dict(orient='list')
+                    # samples.drop(columns='scores').to_dict(orient='list') # output as columns
+                    samples.drop(columns=['scores', vect_col, "from"]).to_dict(orient='records') #output as rows
                     )
 
         else:
