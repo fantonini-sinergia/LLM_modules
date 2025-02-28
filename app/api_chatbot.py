@@ -12,9 +12,12 @@ api_chatbot_bp = Blueprint('api_chatbot', __name__)
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 
-llm_name = os.path.join(k.models_path, k.llm_model)
-tokenizer_name = os.path.join(k.models_path, k.llm_tokenizer)
-embedding_model_name = os.path.join(k.models_path, k.embedding_model)
+# llm_name = os.path.join(k.models_path, k.llm_model)
+# tokenizer_name = os.path.join(k.models_path, k.llm_tokenizer)
+# embedding_model_name = os.path.join(k.models_path, k.embedding_model)
+llm_name = k.llm_model
+tokenizer_name = k.llm_tokenizer
+embedding_model_name = k.embedding_model
 
 # LLM model initialization
 llm_model = Llm(
@@ -22,6 +25,8 @@ llm_model = Llm(
     tokenizer_name, 
     k.system,
     bnb_config = k.bnb_config,
+    api_base_url=k.api_base_url,
+    api_key=k.api_key,
     )
 print("LLM initialized")
 

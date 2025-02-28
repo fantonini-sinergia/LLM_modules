@@ -1,5 +1,5 @@
 from transformers import AutoModelForCausalLM, BitsAndBytesConfig, AutoTokenizer
-import OpenAI
+from openai import OpenAI
 
 class Llm:
     def __init__(

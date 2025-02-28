@@ -16,22 +16,36 @@ chars_per_token = 4
 rag_context_ratio = 0.2
 perm_rag_context_ratio = 0.2
 
-# llm constants
-models_path = r'C:\Users\FilippoAntonini\OneDrive - Sinergia\LLMs-SIN031\models_and_datasets'
-llm_model = "Qwen\\Qwen2.5-0.5B-Instruct"
-llm_tokenizer = "Qwen\\Qwen2.5-0.5B-Instruct"
-bnb_config = {
-    "load_in_4bit": True,
-    "bnb_4bit_compute_dtype": "float16",
-    "bnb_4bit_quant_type": "nf4",
-    "bnb_4bit_use_double_quant": False
-}
-embedding_model = "sentence-transformers\\all-MiniLM-L6-v2"
-device = "cuda"
+# llm constants (local)
+# models_path = r'C:\Users\FilippoAntonini\OneDrive - Sinergia\LLMs-SIN031\models_and_datasets'
+# llm_model = "Qwen\\Qwen2.5-0.5B-Instruct"
+# llm_tokenizer = "Qwen\\Qwen2.5-0.5B-Instruct"
+# bnb_config = {
+#     "load_in_4bit": True,
+#     "bnb_4bit_compute_dtype": "float16",
+#     "bnb_4bit_quant_type": "nf4",
+#     "bnb_4bit_use_double_quant": False
+# }
+# max_new_tokens = 2048
+# temperature = 0.6
+# top_p = 0.9
+# api_base_url = None
+# api_key = None
+
+# llm constants (api)
+models_path = ""
+llm_model = "openai/gpt-4o"
+llm_tokenizer = None
+bnb_config = None
 max_new_tokens = 2048
 temperature = 0.6
 top_p = 0.9
+api_base_url = "https://openrouter.ai/api/v1"
+api_key = "<OPENROUTER_API_KEY>"
 
+# embedding constants
+embedding_model = "sentence-transformers\\all-MiniLM-L6-v2"
+device = "cuda"
 
 # permanent vdbs constants
 perm_vdbs_folder = r'C:\Users\FilippoAntonini\OneDrive - Sinergia\LLM_modules\permanent_vdbs\FAB_M004_manuali'
