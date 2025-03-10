@@ -155,7 +155,6 @@ def infer():
 
         if search_only:
             # Generate the answer
-            import json
             answer = """Ecco che cosa ho trovato per te:
             """ + "\n".join(["\n".join([f"{k}: {v}" for k, v in samp.items()]) for samp in samples_for_search[0]])
             user_chats[user_id]['chat'].append({"question": prompt, "answer": answer})
