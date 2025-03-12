@@ -41,7 +41,7 @@ max_new_tokens = 2048
 temperature = 0.6
 top_p = 0.9
 api_base_url = "https://openrouter.ai/api/v1"
-api_key = "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"
+api_key = "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"
 
 # embedding constants
 embedding_model = r'C:\Users\FilippoAntonini\OneDrive - Sinergia\LLMs-SIN031\models_and_datasets\sentence-transformers\all-MiniLM-L6-v2'

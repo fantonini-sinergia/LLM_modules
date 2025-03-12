@@ -1,4 +1,5 @@
 import os
+import json
 import tempfile
 import app.chatbot_constants as k
 from app.llm import Llm
@@ -12,12 +13,11 @@ api_chatbot_bp = Blueprint('api_chatbot', __name__)
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 
-# llm_name = os.path.join(k.models_path, k.llm_model)
-# tokenizer_name = os.path.join(k.models_path, k.llm_tokenizer)
-# embedding_model_name = os.path.join(k.models_path, k.embedding_model)
+# load constants
 llm_name = k.llm_model
 tokenizer_name = k.llm_tokenizer
 embedding_model_name = k.embedding_model
+system = k.system
 
 # LLM model initialization
 llm_model = Llm(
@@ -34,35 +34,27 @@ print("LLM initialized")
 embedding_model = Embedding(embedding_model_name, k.device)
 print("Embedding model initialized")
 
-# chat initialization
-user_chats = {}
-system = k.system
+# Load users
+with open('users.json', 'r') as f:
+    user = json.load(f)
+print("User data loaded from users.json")
 
 # Endpoint per inferenza
 @api_chatbot_bp.route('/infer', methods=['POST'])
 def infer():
     try:
-        # Recupera i dati dal corpo della richiesta
         data = request.get_json()
-        prompt = data.get('prompt')
-        attachments = request.files.getlist("files")
-        rag_datasets = data.get('rag_datasets')
-        search_dataset_url = data.get('search_dataset_url')
-        search_dataset_vect_columns = data.get('search_dataset_vect_columns')
-        search_only = data.get('search_only')
-        user_id = data.get('user_id')
 
+        prompt = data.get('prompt')
+        user_id = data.get('user_id')
+        attachments = request.files.getlist("files")
         if not prompt or not user_id:
             return jsonify({'error': 'I campi "prompt" e "user_id" sono richiesti.'}), 400
-        if search_dataset_url and not search_dataset_vect_columns:
-            return jsonify({'error': 'Il campo "api_dataset_vect_columns" è richiesto se "api_dataset" è presente.'}), 400
+
 
         # Initialize chat history for the user if not already present
-        if user_id not in user_chats:
-            user_chats[user_id] = {
-                'chat': [],
-                'tokens_per_msg': [],
-            }
+        if user_id not in [id for id in user[user_id]]:
+            user.append({user_id: {"chat": [], "tokens_per_msg": []}})
 
         # Get RAG dataset
         if rag_datasets == None:

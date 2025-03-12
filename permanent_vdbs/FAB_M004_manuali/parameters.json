@@ -1,1 +1,1 @@
-{"as_excel": false, "vect_columns": [], "vdbs_params": [{"chars_per_bunch": 3000, "resplits": 2}, {"chars_per_bunch": 500, "resplits": 2}], "extend_params": {"add_chars": 2000, "add_chars_nr_char_thr": 1500}}
+{"vdbs_params": [{"chars_per_bunch": 3000, "resplits": 2}, {"chars_per_bunch": 500, "resplits": 2}], "extend_params": {"add_chars": 2000, "add_chars_nr_char_thr": 1500}}

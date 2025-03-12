@@ -1,0 +1,14 @@
+[
+    {
+        "user_id": "user1",
+        "url": "http://example.com/dataset1"
+    },
+    {
+        "user_id": "user2",
+        "url": "http://example.com/dataset2"
+    },
+    {
+        "user_id": "user3",
+        "url": "http://example.com/dataset3"
+    }
+]
