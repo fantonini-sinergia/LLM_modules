@@ -1,25 +1,29 @@
 from transformers import AutoModelForCausalLM, BitsAndBytesConfig, AutoTokenizer
 from openai import OpenAI
+import os
 
 class Llm:
     def __init__(
             self,
-            llm, 
-            tokenizer,
             system,
+            llm = None, 
+            tokenizer = None,
             bnb_config=None, 
             api_base_url = None,
             api_key = None,
             ):
         if api_base_url is None:
-            if bnb_config is not None:
+            """
+            On premise LLM initialization
+            """
+            if llm:
                 bnb_config = BitsAndBytesConfig(**bnb_config)
             self.model = AutoModelForCausalLM.from_pretrained(
-                llm,
+                os.path.join(os.getcwd(), llm),
                 quantization_config=bnb_config,
                 device_map="auto"
             )
-            self.tokenizer = AutoTokenizer.from_pretrained(tokenizer)
+            self.tokenizer = AutoTokenizer.from_pretrained(os.path.join(os.getcwd(), tokenizer))
             if self.tokenizer.pad_token is None:
                 self.tokenizer.pad_token = self.tokenizer.eos_token
             self.system = system
@@ -30,8 +34,12 @@ class Llm:
             ).to(self.model.device).shape[-1]
             self.max_input_length = self.tokenizer.model_max_length
         else:
+            """
+            API LLM initialization
+            """
             self.client = OpenAI(api_key=api_key, base_url=api_base_url)
             self.model = llm
+            self.tokenizer = None
 
 
     def llm_qa(
@@ -46,8 +54,10 @@ class Llm:
         print("generating the answer...")
 
         chat["chat"] += question
-        if self.tokenizer is not None:
-
+        if self.tokenizer:
+            """
+            On premise LLM inference
+            """
             # chat adaptation
             question = [
                 {"role": "user", "content": question}
@@ -87,11 +97,14 @@ class Llm:
             chat["tokens_per_msg"].append(len(response))
         
         else:
-
+            """
+            API LLM inference
+            """
             result = self.client.chat.completions.create(
                 model=self.model,
                 messages=chat["chat"],
             )
+            result = str(result["choices"][0]["message"]["content"])
 
         chat["chat"] += [
             {"role": "assistant", "content": result}

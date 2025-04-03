@@ -33,18 +33,17 @@ perm_rag_context_ratio = 0.2
 # api_key = None
 
 # llm constants (api)
-models_path = ""
-llm_model = "openai/gpt-4o"
+llm_model = "meta-llama/llama-3.3-70b-instruct:free"
 llm_tokenizer = None
 bnb_config = None
 max_new_tokens = 2048
 temperature = 0.6
 top_p = 0.9
 api_base_url = "https://openrouter.ai/api/v1"
-api_key = "<OPENROUTER_API_KEY>"
+api_key = "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"
 
 # embedding constants
-embedding_model = "sentence-transformers\\all-MiniLM-L6-v2"
+embedder = r'C:\Users\FilippoAntonini\OneDrive - Sinergia\LLMs-SIN031\models_and_datasets\sentence-transformers\all-MiniLM-L6-v2'
 device = "cuda"
 
 # permanent vdbs constants

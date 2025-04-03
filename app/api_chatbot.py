@@ -1,4 +1,5 @@
 import os
+import traceback
 import tempfile
 import app.chatbot_constants as k
 from app.llm import Llm
@@ -6,32 +7,25 @@ from app.vector_databases.embedding import Embedding
 from app.vector_databases.file_processing import extract_page
 from app.vector_databases.vdbs import Vdbs
 from flask import Blueprint, request, jsonify
+from fastapi import Body, File, UploadFile
 
 api_chatbot_bp = Blueprint('api_chatbot', __name__)
 
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
-
-# llm_name = os.path.join(k.models_path, k.llm_model)
-# tokenizer_name = os.path.join(k.models_path, k.llm_tokenizer)
-# embedding_model_name = os.path.join(k.models_path, k.embedding_model)
-llm_name = k.llm_model
-tokenizer_name = k.llm_tokenizer
-embedding_model_name = k.embedding_model
-
 # LLM model initialization
 llm_model = Llm(
-    llm_name, 
-    tokenizer_name, 
     k.system,
+    llm = k.llm_model, 
+    tokenizer = k.llm_tokenizer, 
     bnb_config = k.bnb_config,
     api_base_url=k.api_base_url,
     api_key=k.api_key,
     )
 print("LLM initialized")
 
-# Embedding model initialization
-embedding_model = Embedding(embedding_model_name, k.device)
+# embedder initialization
+embedding_model = Embedding(k.embedder, k.device)
 print("Embedding model initialized")
 
 # chat initialization
@@ -40,63 +34,58 @@ system = k.system
 
 # Endpoint per inferenza
 @api_chatbot_bp.route('/infer', methods=['POST'])
-def infer():
+def infer(
+    
+):
     try:
         # Recupera i dati dal corpo della richiesta
+        # prompt = None,
         data = request.get_json()
-        prompt = data.get('prompt')
-        attachments = request.files.getlist("files")
-        rag_datasets = data.get('rag_datasets')
+        prompt = data.get('prompt', None),
+        audio = data.get('audio', None),
+        attachments = data.get('files', None)
+        chat = data.get('chat', None)
+        rag_datasets = data.get('rag_datasets', None)
+        # prompt: str = Body(None),
+        # audio: UploadFile = File(None),
+        # attachments = request.files.getlist("files")
+        # chat = Body(None)
+        # rag_datasets = File(None)
+        """
         search_dataset_url = data.get('search_dataset_url')
         search_dataset_vect_columns = data.get('search_dataset_vect_columns')
         search_only = data.get('search_only')
-        user_id = data.get('user_id')
+        """
 
-        if not prompt or not user_id:
-            return jsonify({'error': 'I campi "prompt" e "user_id" sono richiesti.'}), 400
-        if search_dataset_url and not search_dataset_vect_columns:
-            return jsonify({'error': 'Il campo "api_dataset_vect_columns" è richiesto se "api_dataset" è presente.'}), 400
-
-        # Initialize chat history for the user if not already present
-        if user_id not in user_chats:
-            user_chats[user_id] = {
-                'chat': [],
-                'tokens_per_msg': [],
+        # if not existing, initialize the chat
+        if chat == None:
+            chat = {
+                "chat": system,
+                "tokens_per_msg": [],
             }
 
         # Get RAG dataset
         if rag_datasets == None:
             rag_datasets = []
+            perm_vdbs = None
         for rag_dataset in rag_datasets:
 
             """
-            Questa parte è da completare non appena hai sistemato Carloni.
-            Per ora lascia la lista reg_datasets vuota e non toccare il codice
+            Da completare
             """
-            if type(rag_dataset) == str:
-                # RAG from files
-                if rag_dataset == "files":
-                    if attachments:
-                        pass
-                    else:
-                        return jsonify({'error': 'You set "files" as rag dataset but missed the attachments'}), 400
-                # RAG from directory
-                else: 
-                    rag_dataset_url = rag_datasets
-                    perm_vdbs = Vdbs.from_dir(
-                        rag_dataset_url,
-                        embedding_model.get_embeddings_for_vdb,
-                        **k.extend_params,
-                        )
-        print("rag_datasets loaded")
+            rag_dataset_url = rag_datasets
+            perm_vdbs = Vdbs.from_dir(
+                rag_dataset_url,
+                embedding_model.get_embeddings_for_vdb,
+                **k.extend_params,
+                )
+            print("rag_datasets loaded")
 
 
         # Get the attachments
         if attachments:
-
             """
-            Questa parte è da completare non appena hai sistemato Carloni.
-            Per ora lascia non aggiungere file
+            Da completare
             """
             files = []
             for file in attachments:
@@ -104,7 +93,7 @@ def infer():
                 file.save(temp_file_path)
                 files.append({"name": file.filename, "path": temp_file_path})
             print(f'{len(files)} files attached')
-            files_temp_vdbs = Vdbs.from_files_list(
+            temp_vdbs = Vdbs.from_files_list(
                 files, 
                 embedding_model.get_embeddings_for_vdb, 
                 False,
@@ -112,39 +101,22 @@ def infer():
                 **k.extend_params,
                 )
             print("Temporary vdbs created from attachments")
+        else:
+            temp_vdbs = None
             
-        # Get search dataset from the API
-        if search_dataset_url:
-            json_temp_vdbs = Vdbs.from_api(
-                search_dataset_url, 
-                embedding_model.get_embeddings_for_vdb, 
-                True,
-                vect_columns = search_dataset_vect_columns,
-            )
-            print("Temporary vdbs created from api")
         
-        if not search_only:
-            # Get the samples from the permanent vdbs
-            if perm_vdbs:
-                samples_from_perm = perm_vdbs.get_rag_samples(
-                    prompt, 
-                    embedding_model.get_embeddings_for_question, 
-                    nr_bunches = 1,
-                    )
-                print("retrieved from permanent vdbs")
+        # Get the samples from the permanent vdbs
+        if perm_vdbs:
+            samples_from_perm = perm_vdbs.get_rag_samples(
+                prompt, 
+                embedding_model.get_embeddings_for_question, 
+                nr_bunches = 1,
+                )
+            print("retrieved from permanent vdbs")
 
-            # Get the samples from the files temporary vdbs
-            if files_temp_vdbs:
-                samples_from_temp = files_temp_vdbs.get_rag_samples(
-                    prompt, 
-                    embedding_model.get_embeddings_for_question, 
-                    nr_bunches = 1,
-                    )
-                print("retrieved from temporary vdbs")
-
-        # Get the samples from the API temporary vdbs
-        if search_only:
-            samples_for_search = json_temp_vdbs.get_rag_samples(
+        # Get the samples from the temporary vdbs
+        if temp_vdbs:
+            samples_from_temp = temp_vdbs.get_rag_samples(
                 prompt, 
                 embedding_model.get_embeddings_for_question, 
                 nr_bunches = 1,
@@ -152,29 +124,41 @@ def infer():
             print("retrieved from temporary vdbs")
 
 
-
+        """
+        Carloni:
         if search_only:
             # Generate the answer
             import json
-            answer = """Ecco che cosa ho trovato per te:
-            """ + "\n".join(["\n".join([f"{k}: {v}" for k, v in samp.items()]) for samp in samples_for_search[0]])
+            answer = "Ecco che cosa ho trovato per te:" + "\n".join(["\n".join([f"{k}: {v}" for k, v in samp.items()]) for samp in samples_for_search[0]])
             user_chats[user_id]['chat'].append({"question": prompt, "answer": answer})
             print("answer generated")
+        """
 
-        else:
+        samples = None
+
+        if perm_vdbs:
             keys = samples_from_perm[0].keys()
             samples = {key: [] for key in keys}
             for d in samples_from_perm:
                 for key in keys:
                     samples[key] += d[key]
-                    
-            if attachments:
-                # Join perm and temp samples
+            print("joined samples from permanent vdbs")
+            if temp_vdbs:
                 for d in samples_from_temp:
                     for key in keys:
                         samples[key] += d[key]
                 print("joined samples from temporary and permanent vdbs")
+        else:
+            if temp_vdbs:
+                keys = samples_from_temp[0].keys()
+                samples = {key: [] for key in keys}
+                for d in samples_from_temp:
+                    for key in keys:
+                        samples[key] += d[key]
+                print("joined samples from temporary vdbs")
+                
 
+        if samples:
             # Join sample contents into rag_context and append to the chat
             rag_context = "Usa le seguenti informazioni per rispondere alla domanda.\
                 \n\n\nContesto:\n" + \
@@ -182,19 +166,14 @@ def infer():
                 "\n\n\nDomanda: "
             print("rag context created")
 
-
             # Generate the answer
-            answer, user_chats[user_id] = llm_model.llm_qa(
-                user_chats[user_id],
+            answer, chat = llm_model.llm_qa(
+                chat,
                 rag_context + prompt,  
                 )
             print("answer generated")
-
-            # # test answer
-            # answer = "This is a test answer"
-
-
-            # Create a temporary directory for PDFs
+            """"
+            temporary single page pdfs creation
             with tempfile.TemporaryDirectory() as temp_dir:
                 print(f"Temporary directory created: {temp_dir}")
                 text_sources = []
@@ -209,21 +188,39 @@ def infer():
                         pdf_source = temp_pdf
                         text_source = f"**{file_name}, pagina {page}**"
                         pdf_sources.append(pdf_source)
-                    else:
-                        content = samples["content"][i]
-                        text_source = f"**{file_name}, pagina {page}**\n{content}".replace("\n\n", "\n")
-                    text_sources.append(text_source)
-                print(f"rag sources formatted")
+            """
+            text_sources = []
+            for i, page in enumerate(samples["page"]):
+                file_name = samples["file_name"][i]
+                content = samples["content"][i]
+                text_source = f"**{file_name}, pagina {page}**\n{content}".replace("\n\n", "\n")
+            text_sources.append(text_source)
+            print(f"rag sources formatted")
 
+            response = {
+                'prompt': prompt,
+                'response': answer,
+                'text_sources': text_sources
+                # 'pdf_sources': pdf_sources
+            }
 
-        response = {
-            'prompt': prompt,
-            'response': answer,
-            # 'text_sources': text_sources,
-            # 'pdf_sources': pdf_sources
-        }
+        else:
+            # Generate the answer
+            answer, chat = llm_model.llm_qa(
+                chat,
+                prompt,  
+                )
+            print("answer generated")
+
+            response = {
+                'prompt': prompt,
+                'response': answer
+                # 'text_sources': text_sources,
+                # 'pdf_sources': pdf_sources
+            }
 
         return jsonify(response), 200
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        error_trace = traceback.format_exc()
+        return jsonify({'error': str(e), 'traceback': error_trace}), 500
