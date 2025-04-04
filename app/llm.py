@@ -54,6 +54,7 @@ class Llm:
         print("generating the answer...")
 
         chat["chat"] += question
+
         if self.tokenizer:
             """
             On premise LLM inference
@@ -104,7 +105,7 @@ class Llm:
                 model=self.model,
                 messages=chat["chat"],
             )
-            result = str(result["choices"][0]["message"]["content"])
+            result =  result.choices[0].message.content
 
         chat["chat"] += [
             {"role": "assistant", "content": result}

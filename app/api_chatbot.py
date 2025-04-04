@@ -1,13 +1,15 @@
 import os
 import traceback
 import tempfile
+import json
 import app.chatbot_constants as k
 from app.llm import Llm
 from app.vector_databases.embedding import Embedding
 from app.vector_databases.file_processing import extract_page
 from app.vector_databases.vdbs import Vdbs
-from flask import Blueprint, request, jsonify
-from fastapi import Body, File, UploadFile
+from app.audio_processing.stt import stt
+from app.audio_processing.tts import tts
+from flask import Blueprint, request, jsonify, Response
 
 api_chatbot_bp = Blueprint('api_chatbot', __name__)
 
@@ -39,13 +41,13 @@ def infer(
 ):
     try:
         # Recupera i dati dal corpo della richiesta
-        # prompt = None,
-        data = request.get_json()
-        prompt = data.get('prompt', None),
-        audio = data.get('audio', None),
-        attachments = data.get('files', None)
-        chat = data.get('chat', None)
-        rag_datasets = data.get('rag_datasets', None)
+        prompt = request.form.get('prompt', None)
+        audio = request.files.get('audio', None)
+        attachments = request.files.getlist('files')
+        print(attachments)
+        chat = request.form.get('chat', None)
+        rag_datasets = request.form.getlist('rag_datasets')
+        audio_output_mode = request.form.get('audio_output_mode', False)
         # prompt: str = Body(None),
         # audio: UploadFile = File(None),
         # attachments = request.files.getlist("files")
@@ -65,9 +67,7 @@ def infer(
             }
 
         # Get RAG dataset
-        if rag_datasets == None:
-            rag_datasets = []
-            perm_vdbs = None
+        perm_vdbs = None
         for rag_dataset in rag_datasets:
 
             """
@@ -80,7 +80,6 @@ def infer(
                 **k.extend_params,
                 )
             print("rag_datasets loaded")
-
 
         # Get the attachments
         if attachments:
@@ -103,7 +102,20 @@ def infer(
             print("Temporary vdbs created from attachments")
         else:
             temp_vdbs = None
-            
+        
+        # If audio is provided, transcribe it to text
+        if audio:
+            input_audio_path = os.path.join(tempfile.gettempdir(), audio.filename)
+            audio.save(input_audio_path)
+            transcribed_text = stt(input_audio_path)
+            if transcribed_text:
+                if prompt:
+                    prompt = prompt + "\n" + transcribed_text
+                else:
+                    prompt = transcribed_text
+                print("Audio transcription successful")
+            else:
+                raise ValueError("Audio transcription failed")
         
         # Get the samples from the permanent vdbs
         if perm_vdbs:
@@ -134,8 +146,8 @@ def infer(
             print("answer generated")
         """
 
+        # aggregate the samples from all the vdbs
         samples = None
-
         if perm_vdbs:
             keys = samples_from_perm[0].keys()
             samples = {key: [] for key in keys}
@@ -157,19 +169,16 @@ def infer(
                         samples[key] += d[key]
                 print("joined samples from temporary vdbs")
                 
-
+        # answer generation
         if samples:
-            # Join sample contents into rag_context and append to the chat
             rag_context = "Usa le seguenti informazioni per rispondere alla domanda.\
                 \n\n\nContesto:\n" + \
                 "".join(samples["content"]) + \
                 "\n\n\nDomanda: "
             print("rag context created")
-
-            # Generate the answer
             answer, chat = llm_model.llm_qa(
                 chat,
-                rag_context + prompt,  
+                [{"role": "user", "content": rag_context + prompt}],  
                 )
             print("answer generated")
             """"
@@ -196,28 +205,86 @@ def infer(
                 text_source = f"**{file_name}, pagina {page}**\n{content}".replace("\n\n", "\n")
             text_sources.append(text_source)
             print(f"rag sources formatted")
+        else:
+            answer, chat = llm_model.llm_qa(
+                chat,
+                [{"role": "user", "content": prompt}],  
+                )
+            print("answer generated")
+            text_sources = []
 
+        # audio transcription
+        if audio_output_mode:
+            output_audio = tts(answer)
+            output_audio_path = os.path.join(tempfile.gettempdir(), "audio_response.mp3")
+            try:
+                output_audio_data = output_audio.read()
+                # with open(output_audio_path, 'wb') as output_audio_file:
+                    # output_audio_file.write(output_audio.read())
+            except IOError as error:
+                print(f"Error writing audio file: {error}")
+        else:
+            output_audio_path = None
+
+        """
+        # api response
+        response = {
+            'prompt': prompt,
+            'response': answer,
+            'text_sources': text_sources,
+            'chat': chat,
+            'audio': output_audio_path,
+            # 'text_sources': text_sources,
+            # 'pdf_sources': pdf_sources
+        }
+        """
+
+
+
+
+        # Inside your `infer` function
+        if audio_output_mode and output_audio_path:
+            try:
+                # Create a JSON response with text fields
+                json_response = {
+                    'prompt': prompt,
+                    'response': answer,
+                    'text_sources': text_sources,
+                    'chat': chat,
+                }
+
+
+                # Create a multipart response
+                response = Response()
+                response.headers['Content-Type'] = 'multipart/mixed; boundary=boundary'
+
+                # Add JSON part
+                response.data = (
+                    "--boundary\n"
+                    "Content-Type: application/json\n\n"
+                    f"{json.dumps(json_response)}\n"
+                    "--boundary\n"
+                    "Content-Type: audio/mpeg\n"
+                    "Content-Disposition: attachment; filename=audio_response.mp3\n\n"
+                ).encode('utf-8') + output_audio_data + b"\n--boundary--"
+
+                return response
+
+            except IOError as error:
+                print(f"Error reading audio file: {error}")
+                return jsonify({'error': 'Failed to read audio file'}), 500
+        else:
+            # Return only the JSON response if no audio is generated
             response = {
                 'prompt': prompt,
                 'response': answer,
-                'text_sources': text_sources
-                # 'pdf_sources': pdf_sources
+                'text_sources': text_sources,
+                'chat': chat,
             }
 
-        else:
-            # Generate the answer
-            answer, chat = llm_model.llm_qa(
-                chat,
-                prompt,  
-                )
-            print("answer generated")
 
-            response = {
-                'prompt': prompt,
-                'response': answer
-                # 'text_sources': text_sources,
-                # 'pdf_sources': pdf_sources
-            }
+
+
 
         return jsonify(response), 200
 

@@ -1,4 +1,10 @@
-# chat constants
+import json
+import os
+
+config_file_path = os.path.join(os.path.dirname(__file__), "config.json")
+with open(config_file_path, "r") as config_file:
+    config = json.load(config_file)
+
 system = [
     {
         "role": "system",
@@ -33,21 +39,21 @@ perm_rag_context_ratio = 0.2
 # api_key = None
 
 # llm constants (api)
-llm_model = "meta-llama/llama-3.3-70b-instruct:free"
+llm_model = config.get("llm_model", None)
 llm_tokenizer = None
 bnb_config = None
 max_new_tokens = 2048
 temperature = 0.6
 top_p = 0.9
-api_base_url = "https://openrouter.ai/api/v1"
-api_key = "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"
+api_base_url = config.get("api_base_url", None)
+api_key = config.get("api_key", None)
 
 # embedding constants
-embedder = r'C:\Users\FilippoAntonini\OneDrive - Sinergia\LLMs-SIN031\models_and_datasets\sentence-transformers\all-MiniLM-L6-v2'
+embedder = config.get("embedder", None)
 device = "cuda"
 
 # permanent vdbs constants
-perm_vdbs_folder = r'C:\Users\FilippoAntonini\OneDrive - Sinergia\LLM_modules\permanent_vdbs\FAB_M004_manuali'
+perm_vdbs_folder = config.get("perm_vdbs_folder", None)
 
 # temporary vdbs constants
 chars_per_word = 4.8
